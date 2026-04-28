@@ -5,10 +5,10 @@
 
 import React, { useState } from "react";
 import * as xlsx from "xlsx";
-import { Upload, AlertCircle, BarChart3, TrendingUp } from "lucide-react";
+import { Upload, AlertCircle, BarChart3, TrendingUp, Package, List } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Input } from "@/src/components/ui/input";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
+import { Tooltip, ResponsiveContainer, Legend, Cell, BarChart, Bar, CartesianGrid, XAxis, YAxis } from "recharts";
 import { DefectData, SymptomSummary } from "@/src/types";
 
 export default function App() {
@@ -35,23 +35,60 @@ export default function App() {
       // Assuming headers are at the 7th row (index 6, so we skip first 6 rows)
       // { range: 6, raw: false } means skip 6 rows and use 7th row as headers, preserving date formats.
       const rawData = xlsx.utils.sheet_to_json(worksheet, { range: 6, raw: false }) as Record<string, any>[];
+      const limitedData = rawData.slice(0, 310);
 
       const parsedData: DefectData[] = [];
       const keywordCount: Record<string, number> = {};
 
-      for (const row of rawData) {
-        const date = row["최초 불량 발생일"] || row["최초불량발생일"];
-        const productFamily = row["제품군"];
-        const quantity = row["수량"];
-        const actionQty = row["조치수량"];
-        const symptom = row["부적합 증상"] || row["부적합증상"];
+      for (const row of limitedData) {
+        let date = row["최초 불량 발생일"] || row["최초불량발생일"];
+        let productFamily = row["제품군"];
+        let quantity = row["수량"];
+        let actionQty = row["조치수량"] || row["조치 수량"];
+        let symptom = row["부적합 증상"] || row["부적합증상"];
+
+        if (date === undefined) {
+          const k = Object.keys(row).find(k => k.replace(/\s+/g, '').includes("최초불량발생일") || k.includes("Date"));
+          if (k) date = row[k];
+        }
+        if (productFamily === undefined) {
+          const k = Object.keys(row).find(k => k.replace(/\s+/g, '').includes("제품군") || k.includes("Product"));
+          if (k) productFamily = row[k];
+        }
+        if (quantity === undefined) {
+          const k = Object.keys(row).find(k => (k.replace(/\s+/g, '').includes("수량") || k.includes("Qty") || k.includes("Quantity")) && !k.includes("조치"));
+          if (k) quantity = row[k];
+        }
+        if (actionQty === undefined) {
+          const k = Object.keys(row).find(k => k.replace(/\s+/g, '').includes("조치수량") || k.includes("Action"));
+          if (k) actionQty = row[k];
+        }
+        if (symptom === undefined) {
+          const k = Object.keys(row).find(k => k.replace(/\s+/g, '').includes("부적합증상") || k.includes("Symptom"));
+          if (k) symptom = row[k];
+        }
 
         if (symptom) {
-          const symptomStr = String(symptom).trim();
+          let symptomStr = String(symptom).trim();
+          const productFamilyStr = productFamily ? String(productFamily).trim() : "-";
+
+          if (symptomStr.includes('A/B') && symptomStr.includes('채널') && symptomStr.includes('편차')) {
+            symptomStr = 'A/B 채널 편차 Fail';
+          } else if (symptomStr.toUpperCase().includes('TX TUNE TEST')) {
+            symptomStr = 'TX Tune Test NG';
+          } else if (symptomStr.includes('3.3') && symptomStr.includes('쇼트')) {
+            symptomStr = '3.3V 쇼트';
+          } else if (symptomStr.includes('영점') && (symptomStr.includes('조정') || symptomStr.includes('조절'))) {
+            symptomStr = '영점조정 Fail';
+          } else if (symptomStr.includes('온도') && symptomStr.includes('튜닝')) {
+            symptomStr = '온도튜닝 Fail';
+          } else if (symptomStr.includes('휘도')) {
+            symptomStr = '휘도 Fail';
+          }
           
           parsedData.push({
             date: date ? String(date) : "",
-            productFamily: productFamily ? String(productFamily) : "",
+            productFamily: productFamilyStr,
             quantity: Number(quantity) || 0,
             actionQuantity: Number(actionQty) || 0,
             symptom: symptomStr,
@@ -79,26 +116,19 @@ export default function App() {
     }
   };
 
-  const totalDefects = data.length;
+  const totalDefects = data.reduce((acc, d) => acc + d.quantity, 0);
   const totalActionQty = data.reduce((acc, d) => acc + d.actionQuantity, 0);
-  const totalQty = data.reduce((acc, d) => acc + d.quantity, 0);
-  const actionRate = totalQty > 0 ? ((totalActionQty / totalQty) * 100).toFixed(1) : "0";
+  const actionRate = totalDefects > 0 ? ((totalActionQty / totalDefects) * 100).toFixed(1) : "0";
 
   const productFamilyCounts: Record<string, number> = {};
   data.forEach(d => {
-    if (d.productFamily) productFamilyCounts[d.productFamily] = (productFamilyCounts[d.productFamily] || 0) + 1;
+    if (d.productFamily) productFamilyCounts[d.productFamily] = (productFamilyCounts[d.productFamily] || 0) + d.quantity;
   });
   const topProductFamily = Object.entries(productFamilyCounts).sort((a,b) => b[1] - a[1])[0]?.[0] || "-";
 
-  const familyDataArr = Object.entries(
-    data.reduce((acc, curr) => {
-      const key = curr.productFamily || "미상";
-      if (!acc[key]) acc[key] = { name: key, quantity: 0, actionQuantity: 0 };
-      acc[key].quantity += curr.quantity;
-      acc[key].actionQuantity += curr.actionQuantity;
-      return acc;
-    }, {} as Record<string, { name: string; quantity: number; actionQuantity: number }>)
-  ).map(e => e[1]).sort((a,b) => b.quantity - a.quantity).slice(0, 10);
+  const familyDataArr = Object.entries(productFamilyCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
 
   return (
     <div className="bg-slate-50 text-slate-900 w-full min-h-screen flex flex-col font-sans overflow-hidden">
@@ -136,95 +166,88 @@ export default function App() {
           </div>
         ) : data.length > 0 && (
           <>
-            <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
               <Card className="bg-white rounded-xl border-slate-200 shadow-sm">
                 <CardContent className="p-5">
                   <p className="text-slate-500 text-xs uppercase font-semibold mb-1">전체 불량 건수</p>
-                  <h3 className="text-2xl font-bold">{totalDefects.toLocaleString()}</h3>
+                  <h3 className="text-3xl font-bold text-slate-800">{totalDefects.toLocaleString()}</h3>
                 </CardContent>
               </Card>
               <Card className="bg-white rounded-xl border-slate-200 shadow-sm">
                 <CardContent className="p-5">
                   <p className="text-slate-500 text-xs uppercase font-semibold mb-1">조치 완료율</p>
-                  <h3 className="text-2xl font-bold">{actionRate}%</h3>
+                  <h3 className="text-3xl font-bold text-emerald-600">{actionRate}%</h3>
                 </CardContent>
               </Card>
               <Card className="bg-white rounded-xl border-slate-200 shadow-sm">
                 <CardContent className="p-5">
                   <p className="text-slate-500 text-xs uppercase font-semibold mb-1">주요 불량 제품군</p>
-                  <h3 className="text-2xl font-bold truncate">{topProductFamily}</h3>
-                </CardContent>
-              </Card>
-              <Card className="bg-white rounded-xl border-slate-200 shadow-sm">
-                <CardContent className="p-5">
-                  <p className="text-slate-500 text-xs uppercase font-semibold mb-1">분석 행 범위</p>
-                  <h3 className="text-2xl font-bold text-blue-600">Row 7 - {6 + data.length}</h3>
+                  <h3 className="text-3xl font-bold text-slate-800 truncate">{topProductFamily}</h3>
                 </CardContent>
               </Card>
             </section>
 
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
-              <Card className="lg:col-span-4 bg-white rounded-xl border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
+              <Card className="bg-white rounded-xl border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
                   <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                     <BarChart3 className="w-4 h-4" />
                     부적합 증상 키워드별 집계
                   </h2>
-                  <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded-full uppercase font-medium">Top Tags</span>
+                  <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded-full uppercase font-medium">Top 10</span>
                 </div>
-                <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+                <CardContent className="flex-1 overflow-y-auto p-6 space-y-5">
                   {summary.slice(0, 10).map((item, idx) => {
                     const maxCount = summary[0]?.count || 1;
                     const percentage = (item.count / maxCount) * 100;
+                    const colors = [
+                      'bg-indigo-600', 'bg-blue-500', 'bg-sky-400', 'bg-teal-400', 
+                      'bg-cyan-500', 'bg-emerald-400', 'bg-green-500', 'bg-lime-400',
+                      'bg-yellow-400', 'bg-amber-500'
+                    ];
                     return (
                       <div className="group" key={idx}>
-                        <div className="flex justify-between text-sm mb-1">
+                        <div className="flex justify-between text-sm mb-2">
                           <span className="font-medium text-slate-700">#{item.symptom}</span>
                           <span className="text-slate-500">{item.count}건</span>
                         </div>
                         <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                          <div className={`h-full transition-all duration-500 ${idx === 0 ? 'bg-blue-500' : idx === 1 ? 'bg-blue-400' : idx === 2 ? 'bg-blue-300' : 'bg-slate-300'}`} style={{ width: `${percentage}%` }}></div>
+                          <div className={`h-full transition-all duration-500 ${colors[idx]}`} style={{ width: `${percentage}%` }}></div>
                         </div>
                       </div>
                     )
                   })}
-                  {/* Keep the original Recharts component if user wants to see the chart */}
-                  <div className="mt-8 pt-4 border-t border-slate-100 h-[250px] hidden sm:block">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={summary.slice(0, 10)} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                        <XAxis type="number" allowDecimals={false} stroke="#94a3b8" fontSize={12} />
-                        <YAxis dataKey="symptom" type="category" width={100} tick={{ fontSize: 11, fill: "#64748b" }} stroke="#e2e8f0" />
-                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }} />
-                        <Bar dataKey="count" fill="#4f46e5" radius={[0, 4, 4, 0]} barSize={16} name="불량 건수" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
                 </CardContent>
               </Card>
 
-              <Card className="lg:col-span-8 bg-white rounded-xl border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[400px]">
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+              <Card className="bg-white rounded-xl border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
                   <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4" />
-                    제품군별 불량 및 조치 현황
+                    <Package className="w-4 h-4" />
+                    제품군별 집계
                   </h2>
+                  <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded-full uppercase font-medium">Top 10</span>
                 </div>
-                <CardContent className="flex-1 p-6">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={familyDataArr} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                        cursor={{ fill: '#f8fafc' }}
-                      />
-                      <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
-                      <Bar dataKey="quantity" fill="#ef4444" radius={[4, 4, 0, 0]} name="발생 수량" barSize={32} />
-                      <Bar dataKey="actionQuantity" fill="#22c55e" radius={[4, 4, 0, 0]} name="조치 수량" barSize={32} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <CardContent className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {familyDataArr.slice(0, 10).map((item, idx) => {
+                    const percentageValue = totalDefects > 0 ? Math.round((item.count / totalDefects) * 100) : 0;
+                    const maxCount = familyDataArr[0]?.count || 1;
+                    const barWidth = (item.count / maxCount) * 100;
+                    return (
+                      <div className="group" key={idx}>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="font-medium text-slate-700">{item.name}</span>
+                          <span className="text-slate-800">
+                            <span className="text-slate-400 mr-1 font-normal">{percentageValue}%</span>
+                            <span className="font-bold">{item.count}건</span>
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div className="h-full bg-[#f97316] transition-all duration-500" style={{ width: `${barWidth}%` }}></div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </CardContent>
               </Card>
             </div>
