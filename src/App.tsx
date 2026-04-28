@@ -5,11 +5,10 @@
 
 import React, { useState } from "react";
 import * as xlsx from "xlsx";
-import { Upload, AlertCircle, BarChart3, List } from "lucide-react";
+import { Upload, AlertCircle, BarChart3, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table";
 import { Input } from "@/src/components/ui/input";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { DefectData, SymptomSummary } from "@/src/types";
 
 export default function App() {
@@ -59,7 +58,7 @@ export default function App() {
           });
 
           // Keyword aggregation
-          keywordCount[symptomStr] = (keywordCount[symptomStr] || 0) + 1;
+          keywordCount[symptomStr] = (keywordCount[symptomStr] || 0) + (Number(quantity) || 0);
         }
       }
 
@@ -90,6 +89,16 @@ export default function App() {
     if (d.productFamily) productFamilyCounts[d.productFamily] = (productFamilyCounts[d.productFamily] || 0) + 1;
   });
   const topProductFamily = Object.entries(productFamilyCounts).sort((a,b) => b[1] - a[1])[0]?.[0] || "-";
+
+  const familyDataArr = Object.entries(
+    data.reduce((acc, curr) => {
+      const key = curr.productFamily || "미상";
+      if (!acc[key]) acc[key] = { name: key, quantity: 0, actionQuantity: 0 };
+      acc[key].quantity += curr.quantity;
+      acc[key].actionQuantity += curr.actionQuantity;
+      return acc;
+    }, {} as Record<string, { name: string; quantity: number; actionQuantity: number }>)
+  ).map(e => e[1]).sort((a,b) => b.quantity - a.quantity).slice(0, 10);
 
   return (
     <div className="bg-slate-50 text-slate-900 w-full min-h-screen flex flex-col font-sans overflow-hidden">
@@ -194,53 +203,28 @@ export default function App() {
                 </CardContent>
               </Card>
 
-              <Card className="lg:col-span-8 bg-white rounded-xl border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
+              <Card className="lg:col-span-8 bg-white rounded-xl border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[400px]">
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
                   <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <List className="w-4 h-4" />
-                    세부 불량 현황 리스트
+                    <TrendingUp className="w-4 h-4" />
+                    제품군별 불량 및 조치 현황
                   </h2>
-                  <div className="flex gap-2">
-                    <span className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div> 정상 조치
-                    </span>
-                    <span className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
-                      <div className="w-2 h-2 rounded-full bg-red-500"></div> 미처리
-                    </span>
-                  </div>
                 </div>
-                <CardContent className="flex-1 overflow-auto p-0">
-                  <Table className="w-full text-left text-sm border-collapse min-w-[600px]">
-                    <TableHeader className="bg-slate-50 text-slate-500 sticky top-0 border-b border-slate-100 shadow-sm">
-                      <TableRow className="border-none hover:bg-transparent">
-                        <TableHead className="p-4 font-semibold whitespace-nowrap h-auto">최초 불량 발생일</TableHead>
-                        <TableHead className="p-4 font-semibold whitespace-nowrap h-auto">제품군</TableHead>
-                        <TableHead className="p-4 font-semibold text-right whitespace-nowrap h-auto">수량</TableHead>
-                        <TableHead className="p-4 font-semibold text-right whitespace-nowrap h-auto">조치수량</TableHead>
-                        <TableHead className="p-4 font-semibold whitespace-nowrap h-auto">부적합 증상</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody className="divide-y divide-slate-50">
-                      {data.map((item, idx) => {
-                        const isResolved = item.actionQuantity >= item.quantity && item.quantity > 0;
-                        return (
-                          <TableRow key={idx} className="hover:bg-slate-50/50 transition-colors border-slate-50">
-                            <TableCell className="p-4 tabular-nums text-slate-700 border-none">{item.date}</TableCell>
-                            <TableCell className="p-4 text-slate-700 border-none">{item.productFamily}</TableCell>
-                            <TableCell className="p-4 text-right text-slate-700 border-none">{item.quantity}</TableCell>
-                            <TableCell className={`p-4 text-right border-none font-medium ${isResolved ? 'text-green-600' : 'text-red-500'}`}>
-                              {item.actionQuantity}
-                            </TableCell>
-                            <TableCell className="p-4 border-none">
-                              <span className={`px-2 py-1 text-[11px] rounded font-medium truncate max-w-[200px] sm:max-w-xs inline-block ${isResolved ? 'bg-slate-100 text-slate-600' : 'bg-red-50 text-red-600'}`}>
-                                {item.symptom}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                <CardContent className="flex-1 p-6">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={familyDataArr} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
+                        cursor={{ fill: '#f8fafc' }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
+                      <Bar dataKey="quantity" fill="#ef4444" radius={[4, 4, 0, 0]} name="발생 수량" barSize={32} />
+                      <Bar dataKey="actionQuantity" fill="#22c55e" radius={[4, 4, 0, 0]} name="조치 수량" barSize={32} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
             </div>
