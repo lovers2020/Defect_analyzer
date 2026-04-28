@@ -1,0 +1,6 @@
+{
+  "name": "Defect Analyzer",
+  "description": "Analyze Excel/CSV reports for defect data and aggregate occurrences by keywords.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
