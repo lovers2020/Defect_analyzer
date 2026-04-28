@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import * as xlsx from "xlsx";
 import { Upload, AlertCircle, BarChart3, TrendingUp, Package, List } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
@@ -18,16 +18,40 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  useEffect(() => {
+    const loadDefaultData = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch('/data.xlsx');
+        if (!response.ok) {
+          // If the default data is not found, we don't throw an error, we just leave it empty.
+          // In deployment this will gracefully fail if data.xlsx doesn't exist.
+          setLoading(false);
+          return;
+        }
 
-    setFileName(file.name);
-    setLoading(true);
-    setError(null);
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+          // The dev server might return index.html for missing assets.
+          // In this case, the file doesn't actually exist.
+          setLoading(false);
+          return;
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        setFileName('기본 업로드된 파일 (data.xlsx)');
+        processExcelData(arrayBuffer);
+      } catch (err: any) {
+        console.error("Failed to load default data", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDefaultData();
+  }, []);
 
+  const processExcelData = (arrayBuffer: ArrayBuffer) => {
     try {
-      const arrayBuffer = await file.arrayBuffer();
       const workbook = xlsx.read(arrayBuffer, { type: "array" });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
@@ -109,6 +133,22 @@ export default function App() {
 
       setData(parsedData);
       setSummary(summaryList);
+    } catch (err: any) {
+      setError("파일을 분석하는 중 오류가 발생했습니다: " + err.message);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      processExcelData(arrayBuffer);
     } catch (err: any) {
       setError("파일을 분석하는 중 오류가 발생했습니다: " + err.message);
     } finally {
@@ -208,7 +248,7 @@ export default function App() {
                     return (
                       <div className="group" key={idx}>
                         <div className="flex justify-between text-sm mb-2">
-                          <span className="font-medium text-slate-700">#{item.symptom}</span>
+                          <span className="font-medium text-slate-700"># {item.symptom}</span>
                           <span className="text-slate-500">{item.count}건</span>
                         </div>
                         <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -228,7 +268,7 @@ export default function App() {
                   </h2>
                   <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded-full uppercase font-medium">Top 10</span>
                 </div>
-                <CardContent className="flex-1 overflow-y-auto p-6 space-y-6">
+                <CardContent className="flex-1 overflow-y-auto p-6 space-y-5">
                   {familyDataArr.slice(0, 10).map((item, idx) => {
                     const percentageValue = totalDefects > 0 ? Math.round((item.count / totalDefects) * 100) : 0;
                     const maxCount = familyDataArr[0]?.count || 1;
