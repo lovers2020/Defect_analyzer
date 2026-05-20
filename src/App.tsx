@@ -84,12 +84,11 @@ export default function App() {
         range: 6,
         raw: false,
       }) as Record<string, any>[];
-      const limitedData = rawData.slice(0, 310);
 
       const parsedData: DefectData[] = [];
       const keywordCount: Record<string, number> = {};
 
-      for (const row of limitedData) {
+      for (const row of rawData) {
         let date = row["최초 불량 발생일"] || row["최초불량발생일"];
         let productFamily = row["제품군"];
         let quantity = row["수량"];
@@ -279,6 +278,9 @@ export default function App() {
               className="hidden"
               accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
               onChange={handleFileUpload}
+              onClick={(e) => {
+                (e.target as HTMLInputElement).value = "";
+              }}
               disabled={loading}
             />
           </label>
@@ -345,7 +347,7 @@ export default function App() {
                       <BarChart3 className="w-4 h-4" />
                       부적합 증상 키워드별 집계
                     </h2>
-                    <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded-full uppercase font-medium">
+                    <span className="text-[11px] bg-slate-200 px-2 py-0.5 rounded-full uppercase font-medium">
                       Top 10
                     </span>
                   </div>
@@ -400,7 +402,7 @@ export default function App() {
                       <Package className="w-4 h-4" />
                       제품군별 집계
                     </h2>
-                    <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded-full uppercase font-medium">
+                    <span className="text-[11px] bg-slate-200 px-2 py-0.5 rounded-full uppercase font-medium">
                       Top 10
                     </span>
                   </div>
