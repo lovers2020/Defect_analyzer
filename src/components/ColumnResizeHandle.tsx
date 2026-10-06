@@ -19,7 +19,7 @@ export function ColumnResizeHandle({ label, width, onResize, onReset }: {
       aria-valuemax={640}
       aria-valuenow={width}
       title="드래그 또는 방향키로 너비 조절 · 더블클릭으로 자동 너비 복원"
-      className="absolute right-0 top-0 h-full w-2 cursor-col-resize touch-none select-none hover:bg-blue-300 focus:bg-blue-300 focus:outline-none"
+      className="absolute right-0 top-0 h-full w-2 cursor-col-resize touch-none select-none hover:bg-amber-300 focus:bg-amber-300 focus:outline-none"
       onPointerDown={(event) => {
         if (event.button !== 0) return;
         event.preventDefault();

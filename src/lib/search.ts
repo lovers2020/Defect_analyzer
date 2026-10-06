@@ -11,7 +11,10 @@ const normalize = (value: string) => value.trim().toLocaleLowerCase().replace(/\
 
 export function matchesFilters(row: SearchFilters, filters: SearchFilters) {
   return (Object.keys(filters) as (keyof SearchFilters)[]).every(
-    (field) => normalize(row[field]).includes(normalize(filters[field])),
+    (field) => !normalize(filters[field]) ||
+      (field === "productFamily" || field === "modelName"
+        ? normalize(row[field]) === normalize(filters[field])
+        : normalize(row[field]).includes(normalize(filters[field]))),
   );
 }
 

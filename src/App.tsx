@@ -5,36 +5,9 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import * as xlsx from "xlsx";
-import {
-  Upload,
-  AlertCircle,
-  BarChart3,
-  TrendingUp,
-  Package,
-  List,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/src/components/ui/card";
-import { Input } from "@/src/components/ui/input";
-import {
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  Cell,
-  BarChart,
-  Bar,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { DefectData, RawColumn, RawRow, SearchFilters } from "@/src/types";
-import { SearchPanel } from "@/src/components/SearchPanel";
-import { RawDataTable } from "@/src/components/RawDataTable";
-import { emptyFilters, matchesFilters } from "@/src/lib/search";
+import { Dashboard } from "@/src/components/Dashboard";
+import { emptyFilters, matchesFilters, matchesRawSearch } from "@/src/lib/search";
 
 export default function App() {
   const [data, setData] = useState<DefectData[]>([]);
@@ -46,6 +19,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [completionAvailable, setCompletionAvailable] = useState(false);
+  const [rawQuery, setRawQuery] = useState("");
 
   useEffect(() => {
     const loadDefaultData = async () => {
@@ -129,20 +104,11 @@ export default function App() {
       const parsedData: DefectData[] = [];
 
       for (const row of rawData) {
-        let date = row["최초 불량 발생일"] || row["최초불량발생일"];
         let productFamily = row["제품군"];
         let quantity = row["수량"];
         let actionQty = row["조치수량"] || row["조치 수량"];
         let symptom = row["부적합 증상"] || row["부적합증상"];
 
-        if (date === undefined) {
-          const k = Object.keys(row).find(
-            (k) =>
-              k.replace(/\s+/g, "").includes("최초불량발생일") ||
-              k.includes("Date"),
-          );
-          if (k) date = row[k];
-        }
         if (productFamily === undefined) {
           const k = Object.keys(row).find(
             (k) =>
@@ -216,7 +182,6 @@ export default function App() {
           }
 
           parsedData.push({
-            date: date ? String(date) : "",
             productFamily: productFamilyStr,
             modelName: sourceRow?.modelName.trim() || "",
             cause: sourceRow?.cause.trim() || "",
@@ -240,6 +205,8 @@ export default function App() {
       setRawColumns(columns);
       setSheetName(firstSheetName);
       setFilters({ ...emptyFilters });
+      setRawQuery("");
+      setCompletionAvailable(Boolean(completionDateColumn) || headers.some((header) => /조치\s*수량|Action/.test(String(header))));
     } catch (err: any) {
       setError("파일을 분석하는 중 오류가 발생했습니다: " + err.message);
     }
@@ -265,253 +232,41 @@ export default function App() {
 
   const filteredData = useMemo(() => data.filter((row) => matchesFilters({ ...row, symptom: row.originalSymptom }, filters)), [data, filters]);
   const filteredRawRows = useMemo(() => rawRows.filter((row) => matchesFilters(row, filters)), [rawRows, filters]);
-  const summary = useMemo(() => {
-    const counts = new Map<string, number>();
-    filteredData.forEach((row) => counts.set(row.symptom, (counts.get(row.symptom) || 0) + row.quantity));
-    return Array.from(counts, ([symptom, count]) => ({ symptom, count })).sort((a, b) => b.count - a.count);
-  }, [filteredData]);
-  const totalDefects = filteredData.reduce((acc, d) => acc + d.quantity, 0);
-  const totalActionQty = filteredData.reduce((acc, d) => acc + d.actionQuantity, 0);
-  const actionRate =
-    totalDefects > 0 ? ((totalActionQty / totalDefects) * 100).toFixed(1) : "0";
-
-  const productFamilyCounts: Record<string, number> = {};
-  filteredData.forEach((d) => {
-    if (d.productFamily)
-      productFamilyCounts[d.productFamily] =
-        (productFamilyCounts[d.productFamily] || 0) + d.quantity;
-  });
-  const topProductFamily =
-    Object.entries(productFamilyCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ||
-    "-";
-
-  const familyDataArr = Object.entries(productFamilyCounts)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
-
+  const families = useMemo(() => Array.from(new Set<string>(rawRows.map((row) => row.productFamily.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko")), [rawRows]);
+  const models = useMemo(() => Array.from(new Set<string>(rawRows.filter((row) => !filters.productFamily || row.productFamily.trim() === filters.productFamily).map((row) => row.modelName.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko")), [rawRows, filters.productFamily]);
+  const changeFilters = (next: SearchFilters) => {
+    setFilters(next.productFamily !== filters.productFamily ? { ...next, modelName: "" } : next);
+    if (Object.values(next).every((value) => !value)) setRawQuery("");
+  };
+  const loadSample = () => {
+    const workbook = xlsx.utils.book_new();
+    const rows = [
+      ["최초 불량 발생일", "제품군", "모델명", "부적합 증상", "발생원인", "수량"],
+      ["2026-10-01", "테스트 제품 A", "TEST-A", "스크래치", "취급 부주의", 3],
+      ["2026-10-02", "테스트 제품 B", "TEST-B", "전원 불량", "납땜 불량", 5],
+      ["2026-10-03", "테스트 제품 A", "TEST-A", "찍힘", "취급 부주의", 2],
+      ["2026-10-04", "테스트 제품 B", "TEST-B", "전원 불량", "부품 불량", 2],
+      ["2026-10-05", "테스트 제품 A", "TEST-A", "스크래치", "취급 부주의", 1],
+    ];
+    xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet([...Array.from({ length: 6 }, () => []), ...rows]), "Sheet1");
+    setError(null);
+    processExcelData(xlsx.write(workbook, { type: "array", bookType: "xlsx" }));
+    setFileName("defect_ui_test.xlsx");
+    setActiveTab("analysis");
+  };
+  const exportResults = () => {
+    const workbook = xlsx.utils.book_new();
+    const columns = rawColumns.filter((column) => column.label.replace(/\s+/g, "") !== "검사수량");
+    const exportRows = activeTab === "raw" ? filteredRawRows.filter((row) => matchesRawSearch(columns.map((column) => row.values[column.index] || ""), rawQuery)) : filteredRawRows;
+    const rows = [columns.map((column) => column.label), ...exportRows.map((row) => columns.map((column) => row.values[column.index] || ""))];
+    xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet(rows), "검색 결과");
+    xlsx.writeFile(workbook, "불량분석_검색결과.xlsx");
+  };
   return (
-    <div className="bg-slate-50 text-slate-900 w-full min-h-screen flex flex-col font-sans overflow-hidden">
-      <nav className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 sm:px-8 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-            <svg
-              className="w-5 h-5 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              ></path>
-            </svg>
-          </div>
-          <span className="font-bold text-lg tracking-tight hidden sm:block">
-            DefectAnalyzer{" "}
-            <span className="text-slate-400 font-normal ml-2 text-sm">
-              v1.2.0
-            </span>
-          </span>
-        </div>
-        <div className="flex items-center gap-4 text-sm font-medium">
-          {fileName && (
-            <span className="text-slate-500 hidden sm:block truncate max-w-[200px]">
-              데이터 소스: {fileName}
-            </span>
-          )}
-          <label className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2">
-            <Upload className="w-4 h-4" />
-            {loading ? "업로드 중..." : "새 파일 업로드"}
-            <Input
-              type="file"
-              className="hidden"
-              accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-              onChange={handleFileUpload}
-              onClick={(e) => {
-                (e.target as HTMLInputElement).value = "";
-              }}
-              disabled={loading}
-            />
-          </label>
-        </div>
-      </nav>
-
-      <main className="flex-1 p-4 sm:p-6 flex flex-col gap-6 overflow-hidden">
-        {error && (
-          <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-md shrink-0 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <p>{error}</p>
-          </div>
-        )}
-
-        {rawRows.length === 0 && !error ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 font-medium pb-20">
-            <span className="text-xl mb-2 text-slate-500">
-              파일을 업로드하여 분석을 시작하세요
-            </span>
-            <span className="text-sm font-normal">
-              7번째 행이 헤더로 사용됩니다
-            </span>
-          </div>
-        ) : (
-          rawRows.length > 0 && (
-            <>
-              <SearchPanel filters={filters} onChange={setFilters} />
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div role="tablist" aria-label="데이터 보기" className="flex rounded-lg bg-slate-200 p-1">
-                  <button type="button" role="tab" id="analysis-tab" aria-selected={activeTab === "analysis"} aria-controls="analysis-panel" onClick={() => setActiveTab("analysis")} className={`rounded-md px-5 py-2 text-sm font-semibold ${activeTab === "analysis" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600"}`}>분석</button>
-                  <button type="button" role="tab" id="raw-tab" aria-selected={activeTab === "raw"} aria-controls="raw-panel" onClick={() => setActiveTab("raw")} className={`rounded-md px-5 py-2 text-sm font-semibold ${activeTab === "raw" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600"}`}>Raw data</button>
-                </div>
-                <p className="text-sm text-slate-500" aria-live="polite">분석 대상 {filteredData.length.toLocaleString()} / {data.length.toLocaleString()}행</p>
-              </div>
-              {activeTab === "raw" ? (
-                <div role="tabpanel" id="raw-panel" aria-labelledby="raw-tab">
-                  <RawDataTable columns={rawColumns} rows={filteredRawRows} sheetName={sheetName} />
-                </div>
-              ) : filteredData.length === 0 ? (
-                <div role="tabpanel" id="analysis-panel" aria-labelledby="analysis-tab" className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500">검색 조건에 맞는 데이터가 없습니다.</div>
-              ) : (
-              <div role="tabpanel" id="analysis-panel" aria-labelledby="analysis-tab" className="flex flex-col gap-6">
-              <section className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
-                <Card className="bg-white rounded-xl border-slate-200 shadow-sm">
-                  <CardContent className="p-5">
-                    <p className="text-slate-500 text-xs uppercase font-semibold mb-1">
-                      검색 결과 불량 건수
-                    </p>
-                    <h3 className="text-3xl font-bold text-slate-800">
-                      {totalDefects.toLocaleString()}
-                    </h3>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white rounded-xl border-slate-200 shadow-sm">
-                  <CardContent className="p-5">
-                    <p className="text-slate-500 text-xs uppercase font-semibold mb-1">
-                      조치 완료율
-                    </p>
-                    <h3 className="text-3xl font-bold text-emerald-600">
-                      {actionRate}%
-                    </h3>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white rounded-xl border-slate-200 shadow-sm">
-                  <CardContent className="p-5">
-                    <p className="text-slate-500 text-xs uppercase font-semibold mb-1">
-                      주요 불량 제품군
-                    </p>
-                    <h3 className="text-3xl font-bold text-slate-800 truncate">
-                      {topProductFamily}
-                    </h3>
-                  </CardContent>
-                </Card>
-              </section>
-
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
-                <Card className="bg-white rounded-xl border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
-                  <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
-                    <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4" />
-                      부적합 증상 키워드별 집계
-                    </h2>
-                    <span className="text-[11px] bg-slate-200 px-2 py-0.5 rounded-full uppercase font-medium">
-                      Top 10
-                    </span>
-                  </div>
-                  <CardContent className="flex-1 overflow-y-auto p-6 space-y-5">
-                    {summary.slice(0, 10).map((item, idx) => {
-                      const maxCount = summary[0]?.count || 1;
-                      const percentage = (item.count / maxCount) * 100;
-                      const percentageValue =
-                        totalDefects > 0
-                          ? Math.round((item.count / totalDefects) * 100)
-                          : 0;
-                      const colors = [
-                        "bg-indigo-600",
-                        "bg-blue-500",
-                        "bg-sky-400",
-                        "bg-teal-400",
-                        "bg-cyan-500",
-                        "bg-emerald-400",
-                        "bg-green-500",
-                        "bg-lime-400",
-                        "bg-yellow-400",
-                        "bg-amber-500",
-                      ];
-                      return (
-                        <div className="group" key={idx}>
-                          <div className="flex justify-between text-sm mb-2">
-                            <span className="font-medium text-slate-700">
-                              # {item.symptom}
-                            </span>
-                            <span className="text-slate-800">
-                              <span className="text-slate-400 mr-1 font-normal">
-                                {percentageValue}%
-                              </span>
-                              <span className="font-bold">{item.count}건</span>
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-500 ${colors[idx]}`}
-                              style={{ width: `${percentage}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white rounded-xl border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
-                  <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
-                    <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      제품군별 집계
-                    </h2>
-                    <span className="text-[11px] bg-slate-200 px-2 py-0.5 rounded-full uppercase font-medium">
-                      Top 10
-                    </span>
-                  </div>
-                  <CardContent className="flex-1 overflow-y-auto p-6 space-y-5">
-                    {familyDataArr.slice(0, 10).map((item, idx) => {
-                      const percentageValue =
-                        totalDefects > 0
-                          ? Math.round((item.count / totalDefects) * 100)
-                          : 0;
-                      const maxCount = familyDataArr[0]?.count || 1;
-                      const barWidth = (item.count / maxCount) * 100;
-                      return (
-                        <div className="group" key={idx}>
-                          <div className="flex justify-between text-sm mb-2">
-                            <span className="font-medium text-slate-700">
-                              {item.name}
-                            </span>
-                            <span className="text-slate-800">
-                              <span className="text-slate-400 mr-1 font-normal">
-                                {percentageValue}%
-                              </span>
-                              <span className="font-bold">{item.count}건</span>
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-[#f97316] transition-all duration-500"
-                              style={{ width: `${barWidth}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-              </div>
-              </div>
-              )}
-            </>
-          )
-        )}
-      </main>
-    </div>
+    <Dashboard data={filteredData} totalRows={data.length} rawRows={filteredRawRows} columns={rawColumns}
+      filters={filters} onFilters={changeFilters} families={families} models={models}
+      activeTab={activeTab} onTab={setActiveTab} fileName={fileName} sheetName={sheetName}
+      loading={loading} error={error} completionAvailable={completionAvailable}
+      onUpload={handleFileUpload} onSample={loadSample} onExport={exportResults} rawQuery={rawQuery} onRawQuery={setRawQuery} />
   );
 }

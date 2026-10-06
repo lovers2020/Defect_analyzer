@@ -1,20 +1,31 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# DefectAnalyzer
 
-# Run and deploy your AI Studio app
+Excel / CSV 공정 부적합 데이터를 검색하고 불량 수량과 조치 완료율을 분석하는 대시보드입니다.
 
-This contains everything you need to run your app locally.
+## 실행
 
-View your app in AI Studio: https://ai.studio/apps/1c5cd29c-e427-48ed-868b-4047c18a176d
+Node.js 환경에서 다음 명령을 실행합니다.
 
-## Run Locally
+```sh
+npm install
+npm run dev
+```
 
-**Prerequisites:**  Node.js
+## 검증 및 배포
 
+```sh
+npm run lint
+npm run build
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Vercel에서 `npm run build`로 빌드하고 `dist`를 배포합니다.
+
+## 사용
+
+- 파일 업로드 또는 샘플 파일로 시작합니다. 첫 번째 시트의 7번째 행을 헤더로 읽습니다.
+- 제품군·모델명·부적합 증상·발생원인으로 검색합니다.
+- 원본 데이터 탭에서 검색하고 열 너비를 조정할 수 있습니다.
+- 결과 내보내기는 현재 검색된 데이터를 Excel 파일로 저장합니다.
+- 조치 완료율은 첫 번째 조치 완료 날짜가 있는 행의 불량 수량을 기준으로 계산하며, 기존 조치수량 열도 지원합니다.
+
+Pretendard 폰트와 SIL Open Font License는 `public/fonts/pretendard`에 포함되어 있습니다.

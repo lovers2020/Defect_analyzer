@@ -1,5 +1,4 @@
 export type DefectData = {
-  date: string;
   productFamily: string;
   modelName: string;
   cause: string;
@@ -26,7 +25,3 @@ export type RawColumn = {
   label: string;
 };
 
-export type SymptomSummary = {
-  symptom: string;
-  count: number;
-};
