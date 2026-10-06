@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import * as xlsx from "xlsx";
 import {
   Upload,
@@ -31,11 +31,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { DefectData, SymptomSummary } from "@/src/types";
+import { DefectData, RawColumn, RawRow, SearchFilters } from "@/src/types";
+import { SearchPanel } from "@/src/components/SearchPanel";
+import { RawDataTable } from "@/src/components/RawDataTable";
+import { emptyFilters, matchesFilters } from "@/src/lib/search";
 
 export default function App() {
   const [data, setData] = useState<DefectData[]>([]);
-  const [summary, setSummary] = useState<SymptomSummary[]>([]);
+  const [filters, setFilters] = useState<SearchFilters>({ ...emptyFilters });
+  const [activeTab, setActiveTab] = useState<"analysis" | "raw">("analysis");
+  const [rawRows, setRawRows] = useState<RawRow[]>([]);
+  const [rawColumns, setRawColumns] = useState<RawColumn[]>([]);
+  const [sheetName, setSheetName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -84,9 +91,42 @@ export default function App() {
         range: 6,
         raw: false,
       }) as Record<string, any>[];
+      const matrix = xlsx.utils.sheet_to_json<string[]>(worksheet, {
+        header: 1,
+        range: 6,
+        raw: false,
+        defval: "",
+        blankrows: true,
+      });
+      const headers = matrix[0] || [];
+      const fieldIndex = (name: string) => headers.findIndex(
+        (header) => String(header).replace(/\s+/g, "").includes(name),
+      );
+      const familyIndex = fieldIndex("제품군");
+      const modelIndex = fieldIndex("모델명");
+      const symptomIndex = fieldIndex("부적합증상");
+      const causeIndex = fieldIndex("발생원인");
+      const sourceRows: RawRow[] = matrix.slice(1)
+        .map((values, index) => ({
+          rowNumber: index + 8,
+          values: Array.from(values, (value) => String(value ?? "")),
+          productFamily: String(values[familyIndex] ?? ""),
+          modelName: String(values[modelIndex] ?? ""),
+          symptom: String(values[symptomIndex] ?? ""),
+          cause: String(values[causeIndex] ?? ""),
+        }))
+        .filter((row) => row.values.some((value) => value.trim()));
+      const columns: RawColumn[] = Array.from(headers, (header, index) => ({
+        index,
+        label: String(header || xlsx.utils.encode_col(index)),
+      })).filter((column) => headers[column.index] || sourceRows.some((row) => row.values[column.index]?.trim()));
+      const sourceByRow = new Map(sourceRows.map((row) => [row.rowNumber, row]));
+      const completionDateColumn = headers.find(
+        (header) =>
+          String(header).replace(/\s+/g, "") === "품질->제조(조치완료)",
+      );
 
       const parsedData: DefectData[] = [];
-      const keywordCount: Record<string, number> = {};
 
       for (const row of rawData) {
         let date = row["최초 불량 발생일"] || row["최초불량발생일"];
@@ -128,6 +168,10 @@ export default function App() {
           );
           if (k) actionQty = row[k];
         }
+        if (completionDateColumn) {
+          const completionDate = String(row[completionDateColumn] ?? "").trim();
+          actionQty = completionDate && completionDate !== "-" ? quantity : 0;
+        }
         if (symptom === undefined) {
           const k = Object.keys(row).find(
             (k) =>
@@ -138,6 +182,7 @@ export default function App() {
         }
 
         if (symptom) {
+          const sourceRow = sourceByRow.get(row.__rowNum__ + 1);
           let symptomStr = String(symptom).trim();
           const productFamilyStr = productFamily
             ? String(productFamily).trim()
@@ -173,14 +218,14 @@ export default function App() {
           parsedData.push({
             date: date ? String(date) : "",
             productFamily: productFamilyStr,
+            modelName: sourceRow?.modelName.trim() || "",
+            cause: sourceRow?.cause.trim() || "",
+            originalSymptom: String(symptom).trim(),
             quantity: Number(quantity) || 0,
             actionQuantity: Number(actionQty) || 0,
             symptom: symptomStr,
           });
 
-          // Keyword aggregation
-          keywordCount[symptomStr] =
-            (keywordCount[symptomStr] || 0) + (Number(quantity) || 0);
         }
       }
 
@@ -190,12 +235,11 @@ export default function App() {
         );
       }
 
-      const summaryList = Object.entries(keywordCount)
-        .map(([k, v]) => ({ symptom: k, count: v }))
-        .sort((a, b) => b.count - a.count);
-
       setData(parsedData);
-      setSummary(summaryList);
+      setRawRows(sourceRows);
+      setRawColumns(columns);
+      setSheetName(firstSheetName);
+      setFilters({ ...emptyFilters });
     } catch (err: any) {
       setError("파일을 분석하는 중 오류가 발생했습니다: " + err.message);
     }
@@ -219,13 +263,20 @@ export default function App() {
     }
   };
 
-  const totalDefects = data.reduce((acc, d) => acc + d.quantity, 0);
-  const totalActionQty = data.reduce((acc, d) => acc + d.actionQuantity, 0);
+  const filteredData = useMemo(() => data.filter((row) => matchesFilters({ ...row, symptom: row.originalSymptom }, filters)), [data, filters]);
+  const filteredRawRows = useMemo(() => rawRows.filter((row) => matchesFilters(row, filters)), [rawRows, filters]);
+  const summary = useMemo(() => {
+    const counts = new Map<string, number>();
+    filteredData.forEach((row) => counts.set(row.symptom, (counts.get(row.symptom) || 0) + row.quantity));
+    return Array.from(counts, ([symptom, count]) => ({ symptom, count })).sort((a, b) => b.count - a.count);
+  }, [filteredData]);
+  const totalDefects = filteredData.reduce((acc, d) => acc + d.quantity, 0);
+  const totalActionQty = filteredData.reduce((acc, d) => acc + d.actionQuantity, 0);
   const actionRate =
     totalDefects > 0 ? ((totalActionQty / totalDefects) * 100).toFixed(1) : "0";
 
   const productFamilyCounts: Record<string, number> = {};
-  data.forEach((d) => {
+  filteredData.forEach((d) => {
     if (d.productFamily)
       productFamilyCounts[d.productFamily] =
         (productFamilyCounts[d.productFamily] || 0) + d.quantity;
@@ -295,7 +346,7 @@ export default function App() {
           </div>
         )}
 
-        {data.length === 0 && !error ? (
+        {rawRows.length === 0 && !error ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 font-medium pb-20">
             <span className="text-xl mb-2 text-slate-500">
               파일을 업로드하여 분석을 시작하세요
@@ -305,13 +356,29 @@ export default function App() {
             </span>
           </div>
         ) : (
-          data.length > 0 && (
+          rawRows.length > 0 && (
             <>
+              <SearchPanel filters={filters} onChange={setFilters} />
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div role="tablist" aria-label="데이터 보기" className="flex rounded-lg bg-slate-200 p-1">
+                  <button type="button" role="tab" id="analysis-tab" aria-selected={activeTab === "analysis"} aria-controls="analysis-panel" onClick={() => setActiveTab("analysis")} className={`rounded-md px-5 py-2 text-sm font-semibold ${activeTab === "analysis" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600"}`}>분석</button>
+                  <button type="button" role="tab" id="raw-tab" aria-selected={activeTab === "raw"} aria-controls="raw-panel" onClick={() => setActiveTab("raw")} className={`rounded-md px-5 py-2 text-sm font-semibold ${activeTab === "raw" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600"}`}>Raw data</button>
+                </div>
+                <p className="text-sm text-slate-500" aria-live="polite">분석 대상 {filteredData.length.toLocaleString()} / {data.length.toLocaleString()}행</p>
+              </div>
+              {activeTab === "raw" ? (
+                <div role="tabpanel" id="raw-panel" aria-labelledby="raw-tab">
+                  <RawDataTable columns={rawColumns} rows={filteredRawRows} sheetName={sheetName} />
+                </div>
+              ) : filteredData.length === 0 ? (
+                <div role="tabpanel" id="analysis-panel" aria-labelledby="analysis-tab" className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500">검색 조건에 맞는 데이터가 없습니다.</div>
+              ) : (
+              <div role="tabpanel" id="analysis-panel" aria-labelledby="analysis-tab" className="flex flex-col gap-6">
               <section className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
                 <Card className="bg-white rounded-xl border-slate-200 shadow-sm">
                   <CardContent className="p-5">
                     <p className="text-slate-500 text-xs uppercase font-semibold mb-1">
-                      전체 불량 건수
+                      검색 결과 불량 건수
                     </p>
                     <h3 className="text-3xl font-bold text-slate-800">
                       {totalDefects.toLocaleString()}
@@ -439,6 +506,8 @@ export default function App() {
                   </CardContent>
                 </Card>
               </div>
+              </div>
+              )}
             </>
           )
         )}
