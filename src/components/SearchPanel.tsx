@@ -26,7 +26,7 @@ export function SearchPanel({ filters, onChange, families, models }: {
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {fields.map(({ key, label }) => (
-          <label key={key} className="space-y-2 text-sm font-medium text-stone-700">
+          <label key={key} className="space-y-2 text-[15px] font-medium text-stone-700">
             <span>{label}</span>
             {key === "productFamily" || key === "modelName" ? (
               <select aria-label={label} value={filters[key]} onChange={(event) => onChange({ ...filters, [key]: event.target.value })} className="design-input">

@@ -117,12 +117,13 @@ export default function App() {
           if (k) productFamily = row[k];
         }
         if (quantity === undefined) {
-          const k = Object.keys(row).find(
+          const keys = Object.keys(row);
+          const k = keys.find((key) => /^(발생수량|불량수량)$/.test(key.replace(/\s+/g, ""))) || keys.find(
             (k) =>
               (k.replace(/\s+/g, "").includes("수량") ||
                 k.includes("Qty") ||
                 k.includes("Quantity")) &&
-              !k.includes("조치"),
+              !/검사|조치|완료|inspection|action|completed/i.test(k),
           );
           if (k) quantity = row[k];
         }
