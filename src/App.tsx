@@ -100,6 +100,17 @@ export default function App() {
         (header) =>
           String(header).replace(/\s+/g, "") === "품질->제조(조치완료)",
       );
+      const recurrenceIndex = fieldIndex("2차재불량발생일");
+      const completionIndex = fieldIndex("품질->제조(조치완료)");
+      const numericMatrix = xlsx.utils.sheet_to_json<(string | number | null)[]>(worksheet, {
+        header: 1, range: 6, raw: true, defval: null, blankrows: true,
+      });
+      const excelGreaterThan = (left: string | number | null, right: string | number | null) => {
+        const a = left ?? 0;
+        const b = right ?? 0;
+        if (typeof a === typeof b) return a > b;
+        return typeof a === "string";
+      };
 
       const parsedData: DefectData[] = [];
 
@@ -137,7 +148,11 @@ export default function App() {
         }
         if (completionDateColumn) {
           const completionDate = String(row[completionDateColumn] ?? "").trim();
-          actionQty = completionDate && completionDate !== "-" ? quantity : 0;
+          const values = numericMatrix[row.__rowNum__ - 6];
+          const completed = recurrenceIndex >= 0
+            ? excelGreaterThan(values?.[completionIndex] ?? null, values?.[recurrenceIndex] ?? null)
+            : Boolean(completionDate && completionDate !== "-");
+          actionQty = completed ? quantity : 0;
         }
         if (symptom === undefined) {
           const k = Object.keys(row).find(

@@ -36,3 +36,14 @@ assert.equal(legacy.setData[0].actionQuantity, 2);
 const inspectionOnly = analyze(['검사수량', '부적합 증상'], [[999, '전원 불량']]);
 assert.equal(inspectionOnly.setData[0].quantity, 0);
 console.log('Excel new code column, quantity aliases, inspection exclusion and legacy format: passed');
+
+const recurring = analyze(['발생수량', '부적합 증상', '2차 재불량\n발생일', '품질->제조\n(조치완료)', '품질->제조\n(조치완료)'], [
+  [3, 'defect', 46000, 46001, null],
+  [2, 'defect', 46000, 46000, null],
+  [4, 'defect', 46000, 45999, 46002],
+  [5, 'defect', null, 46001, null],
+  [6, 'defect', 46000, null, 46002],
+  [7, 'defect', null, null, null],
+]);
+assert.deepEqual(recurring.setData.map((row) => row.actionQuantity), [3, 0, 0, 5, 0, 0]);
+console.log('Completion date must be after second recurrence, including same-day and duplicate completion columns: passed');
