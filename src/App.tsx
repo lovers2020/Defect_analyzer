@@ -8,6 +8,7 @@ import * as xlsx from "xlsx";
 import { DefectData, RawColumn, RawRow, SearchFilters } from "@/src/types";
 import { Dashboard } from "@/src/components/Dashboard";
 import { emptyFilters, matchesFilters, matchesRawSearch } from "@/src/lib/search";
+import { readUpload, saveUpload } from "@/src/lib/uploadStorage";
 
 export default function App() {
   const [data, setData] = useState<DefectData[]>([]);
@@ -23,10 +24,23 @@ export default function App() {
   const [rawQuery, setRawQuery] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     const loadDefaultData = async () => {
       setLoading(true);
       try {
+        try {
+          const saved = await readUpload();
+          if (cancelled) return;
+          if (saved && processExcelData(saved.buffer)) {
+            setFileName(saved.name);
+            return;
+          }
+        } catch (storageError) {
+          console.error("Failed to restore uploaded file", storageError);
+        }
+        if (cancelled) return;
         const response = await fetch("/data.xlsx");
+        if (cancelled) return;
         if (!response.ok) {
           // If the default data is not found, we don't throw an error, we just leave it empty.
           // In deployment this will gracefully fail if data.xlsx doesn't exist.
@@ -43,15 +57,17 @@ export default function App() {
         }
 
         const arrayBuffer = await response.arrayBuffer();
+        if (cancelled) return;
         setFileName("기본 업로드된 파일 (data.xlsx)");
         processExcelData(arrayBuffer);
       } catch (err: any) {
         console.error("Failed to load default data", err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     loadDefaultData();
+    return () => { cancelled = true; };
   }, []);
 
   const processExcelData = (arrayBuffer: ArrayBuffer) => {
@@ -214,6 +230,7 @@ export default function App() {
         setError(
           "파일에서 데이터를 읽을 수 없거나 '부적합 증상' 열이 없습니다. 7번째 행에 헤더가 있는지 확인해주세요.",
         );
+        return false;
       }
 
       setData(parsedData);
@@ -223,8 +240,11 @@ export default function App() {
       setFilters({ ...emptyFilters });
       setRawQuery("");
       setCompletionAvailable(Boolean(completionDateColumn) || headers.some((header) => /조치\s*수량|Action/.test(String(header))));
+      setError(null);
+      return true;
     } catch (err: any) {
       setError("파일을 분석하는 중 오류가 발생했습니다: " + err.message);
+      return false;
     }
   };
 
@@ -232,13 +252,19 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setFileName(file.name);
     setLoading(true);
     setError(null);
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      processExcelData(arrayBuffer);
+      if (processExcelData(arrayBuffer)) {
+        setFileName(file.name);
+        try {
+          await saveUpload({ name: file.name, buffer: arrayBuffer });
+        } catch {
+          setError("파일은 분석했지만 브라우저에 저장하지 못했습니다. 새로고침하면 다시 업로드해야 합니다.");
+        }
+      }
     } catch (err: any) {
       setError("파일을 분석하는 중 오류가 발생했습니다: " + err.message);
     } finally {
@@ -254,21 +280,29 @@ export default function App() {
     setFilters(next.productFamily !== filters.productFamily ? { ...next, modelName: "" } : next);
     if (Object.values(next).every((value) => !value)) setRawQuery("");
   };
-  const loadSample = () => {
-    const workbook = xlsx.utils.book_new();
-    const rows = [
-      ["최초 불량 발생일", "제품군", "모델명", "부적합 증상", "발생원인", "수량"],
-      ["2026-10-01", "테스트 제품 A", "TEST-A", "스크래치", "취급 부주의", 3],
-      ["2026-10-02", "테스트 제품 B", "TEST-B", "전원 불량", "납땜 불량", 5],
-      ["2026-10-03", "테스트 제품 A", "TEST-A", "찍힘", "취급 부주의", 2],
-      ["2026-10-04", "테스트 제품 B", "TEST-B", "전원 불량", "부품 불량", 2],
-      ["2026-10-05", "테스트 제품 A", "TEST-A", "스크래치", "취급 부주의", 1],
-    ];
-    xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet([...Array.from({ length: 6 }, () => []), ...rows]), "Sheet1");
+  const loadSample = async () => {
     setError(null);
-    processExcelData(xlsx.write(workbook, { type: "array", bookType: "xlsx" }));
-    setFileName("defect_ui_test.xlsx");
-    setActiveTab("analysis");
+    setLoading(true);
+    try {
+      const response = await fetch("/sample-defects-2026-10-week4.xlsx");
+      if (!response.ok || response.headers.get("content-type")?.includes("text/html")) {
+        throw new Error("샘플 파일을 불러오지 못했습니다.");
+      }
+      const buffer = await response.arrayBuffer();
+      if (!processExcelData(buffer)) return;
+      const name = "26년 10월4주차 공정부적합.xlsx";
+      setFileName(name);
+      setActiveTab("analysis");
+      try {
+        await saveUpload({ name, buffer });
+      } catch {
+        setError("샘플 파일은 분석했지만 브라우저에 저장하지 못했습니다. 새로고침하면 다시 선택해야 합니다.");
+      }
+    } catch (err: any) {
+      setError("샘플 파일을 불러오는 중 오류가 발생했습니다: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
   const exportResults = () => {
     const workbook = xlsx.utils.book_new();

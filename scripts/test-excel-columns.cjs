@@ -10,7 +10,7 @@ function analyze(headers, rows) {
   const result = {};
   const setters = ['setData', 'setRawRows', 'setRawColumns', 'setSheetName', 'setFilters', 'setCompletionAvailable', 'setRawQuery'];
   const process = new Function('xlsx', 'setError', 'emptyFilters', ...setters, `${compiled}; return processExcelData;`)(
-    xlsx, (error) => { throw new Error(error); }, {}, ...setters.map((name) => (value) => { result[name] = value; }),
+    xlsx, (error) => { if (error) throw new Error(error); }, {}, ...setters.map((name) => (value) => { result[name] = value; }),
   );
   const workbook = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet([...Array.from({ length: 6 }, () => []), headers, ...rows]), 'test');
