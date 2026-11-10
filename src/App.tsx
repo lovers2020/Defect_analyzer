@@ -9,11 +9,12 @@ import { DefectData, RawColumn, RawRow, SearchFilters } from "@/src/types";
 import { Dashboard } from "@/src/components/Dashboard";
 import { emptyFilters, matchesFilters, matchesRawSearch } from "@/src/lib/search";
 import { readUpload, saveUpload } from "@/src/lib/uploadStorage";
+import { getLotRates } from "@/src/lib/lotRates";
 
 export default function App() {
   const [data, setData] = useState<DefectData[]>([]);
   const [filters, setFilters] = useState<SearchFilters>({ ...emptyFilters });
-  const [activeTab, setActiveTab] = useState<"analysis" | "raw">("analysis");
+  const [activeTab, setActiveTab] = useState<"analysis" | "lot" | "raw">("analysis");
   const [rawRows, setRawRows] = useState<RawRow[]>([]);
   const [rawColumns, setRawColumns] = useState<RawColumn[]>([]);
   const [sheetName, setSheetName] = useState("");
@@ -95,6 +96,7 @@ export default function App() {
       );
       const familyIndex = fieldIndex("제품군");
       const modelIndex = fieldIndex("모델명");
+      const lotIndex = headers.findIndex((header) => String(header).replace(/\s+/g, "").toUpperCase() === "LOT");
       const symptomIndex = fieldIndex("부적합증상");
       const causeIndex = fieldIndex("발생원인");
       const sourceRows: RawRow[] = matrix.slice(1)
@@ -216,6 +218,7 @@ export default function App() {
           parsedData.push({
             productFamily: productFamilyStr,
             modelName: sourceRow?.modelName.trim() || "",
+            lot: String(numericMatrix[row.__rowNum__ - 6]?.[lotIndex] ?? "").trim(),
             cause: sourceRow?.cause.trim() || "",
             originalSymptom: String(symptom).trim(),
             quantity: Number(quantity) || 0,
@@ -306,6 +309,15 @@ export default function App() {
   };
   const exportResults = () => {
     const workbook = xlsx.utils.book_new();
+    if (activeTab === "lot") {
+      const lots = getLotRates(filteredData);
+      const rows = [["제품군", "제품명", "LOT", "LOT 수량", "불량 수량", "불량률"], ...lots.map((lot) => [lot.productFamily, lot.modelName, lot.lot, lot.capacity, lot.quantity, lot.rate])];
+      const sheet = xlsx.utils.aoa_to_sheet(rows);
+      lots.forEach((_, index) => { sheet[xlsx.utils.encode_cell({ r: index + 1, c: 5 })].z = "0.00%"; });
+      xlsx.utils.book_append_sheet(workbook, sheet, "LOT별 불량률");
+      xlsx.writeFile(workbook, "LOT별_불량률.xlsx");
+      return;
+    }
     const columns = rawColumns.filter((column) => column.label.replace(/\s+/g, "") !== "검사수량");
     const exportRows = activeTab === "raw" ? filteredRawRows.filter((row) => matchesRawSearch(columns.map((column) => row.values[column.index] || ""), rawQuery)) : filteredRawRows;
     const rows = [columns.map((column) => column.label), ...exportRows.map((row) => columns.map((column) => row.values[column.index] || ""))];

@@ -1,6 +1,7 @@
 export type DefectData = {
   productFamily: string;
   modelName: string;
+  lot: string;
   cause: string;
   originalSymptom: string;
   quantity: number;

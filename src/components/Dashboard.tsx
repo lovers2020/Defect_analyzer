@@ -4,6 +4,7 @@ import { DefectData, RawColumn, RawRow, SearchFilters } from "@/src/types";
 import { SearchPanel } from "@/src/components/SearchPanel";
 import { RawDataTable } from "@/src/components/RawDataTable";
 import { RankedList } from "@/src/components/RankedList";
+import { LotRateTable } from "@/src/components/LotRateTable";
 
 type Props = {
   data: DefectData[];
@@ -14,8 +15,8 @@ type Props = {
   onFilters: (filters: SearchFilters) => void;
   families: string[];
   models: string[];
-  activeTab: "analysis" | "raw";
-  onTab: (tab: "analysis" | "raw") => void;
+  activeTab: "analysis" | "lot" | "raw";
+  onTab: (tab: "analysis" | "lot" | "raw") => void;
   fileName: string | null;
   sheetName: string;
   loading: boolean;
@@ -62,11 +63,12 @@ export function Dashboard(props: Props) {
         <div className="dashboard-tabs-row">
           <div role="tablist" aria-label="데이터 보기" className="dashboard-tabs">
             <button type="button" role="tab" id="analysis-tab" aria-controls="analysis-panel" aria-selected={props.activeTab === "analysis"} onClick={() => props.onTab("analysis")}>분석</button>
+            <button type="button" role="tab" id="lot-tab" aria-controls="lot-panel" aria-selected={props.activeTab === "lot"} onClick={() => props.onTab("lot")}>LOT별 불량률</button>
             <button type="button" role="tab" id="raw-tab" aria-controls="raw-panel" aria-selected={props.activeTab === "raw"} onClick={viewRaw}>원본 데이터</button>
           </div>
           <div className="tabs-actions"><span aria-live="polite">분석 대상 <strong>{props.data.length.toLocaleString()} / {props.totalRows.toLocaleString()}행</strong></span><button type="button" className="design-button outline" onClick={props.onExport} disabled={props.rawRows.length === 0}><Upload size={16} />결과 내보내기</button></div>
         </div>
-        {props.activeTab === "raw" ? <div role="tabpanel" id="raw-panel" aria-labelledby="raw-tab"><RawDataTable columns={props.columns} rows={props.rawRows} sheetName={props.sheetName || "원본 데이터"} query={props.rawQuery} onQuery={props.onRawQuery} /></div> : (
+        {props.activeTab === "raw" ? <div role="tabpanel" id="raw-panel" aria-labelledby="raw-tab"><RawDataTable columns={props.columns} rows={props.rawRows} sheetName={props.sheetName || "원본 데이터"} query={props.rawQuery} onQuery={props.onRawQuery} /></div> : props.activeTab === "lot" ? <div role="tabpanel" id="lot-panel" aria-labelledby="lot-tab"><LotRateTable data={props.data} /></div> : (
           <div role="tabpanel" id="analysis-panel" aria-labelledby="analysis-tab" className="analysis-content">
             <div className="metric-grid">
               {[{ icon: File, title: "등록 건수", value: `${props.data.length.toLocaleString()}건`, note: "원본 데이터 행 기준" }, { icon: Database, title: "불량 수량", value: `${quantity.toLocaleString()}개`, note: "수량 합계 기준" }, { icon: CheckCircle2, title: "조치 완료율", value: rate, note: props.completionAvailable ? "조치 완료 날짜 기준" : "조치 정보 열이 없습니다." }].map(({ icon: Icon, title, value, note }) => (

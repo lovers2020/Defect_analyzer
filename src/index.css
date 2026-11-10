@@ -7,6 +7,19 @@
   font-display: swap;
 }
 @theme { --font-sans: "Pretendard Variable", Pretendard, sans-serif; }
+
+.lot-rate-heading { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid #dfd2c2; }
+.lot-rate-scroll { overflow: auto; max-height: 560px; }
+.lot-rate-table { width: 100%; min-width: 850px; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+.lot-rate-table th, .lot-rate-table td { padding: 13px 16px; text-align: center; vertical-align: middle; border-bottom: 1px solid #eee8de; line-height: 1.6; }
+.lot-rate-table th { position: sticky; top: 0; z-index: 1; background: #f7f0e4; color: #634b3c; font-weight: 650; }
+.lot-rate-table th button { width: 100%; border: 0; padding: 2px 0; background: transparent; color: inherit; font: inherit; }
+.lot-rate-table th[aria-sort="ascending"], .lot-rate-table th[aria-sort="descending"] { background: #eee4d5; color: #413634; }
+.lot-rate-table td { color: #534337; overflow-wrap: anywhere; }
+.lot-rate-table td:nth-child(3), .lot-rate-table td:nth-child(n+4) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lot-rate-table tbody tr:nth-child(even) { background: #faf6ed; }
+.lot-rate-table tbody tr:last-child td { border-bottom: 0; }
+.lot-rate-value { display: inline-block; min-width: 75px; border-radius: 5px; padding: 3px 9px; background: #eee4d5; color: #634b3c; font-weight: 700; }
 @theme { --color-amber-50: #faf3dc; --color-amber-300: #d3bc9e; --color-amber-500: #8b6c58; --color-amber-600: #413634; }
 
 button {
