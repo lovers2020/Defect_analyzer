@@ -8,7 +8,7 @@ const processing = source.slice(source.indexOf('  const processExcelData ='), so
 const compiled = ts.transpileModule(processing, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 function analyze(headers, rows) {
   const result = {};
-  const setters = ['setData', 'setRawRows', 'setRawColumns', 'setSheetName', 'setFilters', 'setCompletionAvailable', 'setRawQuery'];
+  const setters = ['setData', 'setRawRows', 'setRawColumns', 'setSheetName', 'setFilters', 'setCompletionAvailable', 'setRawQuery', 'setDetailFamily'];
   const process = new Function('xlsx', 'setError', 'emptyFilters', ...setters, `${compiled}; return processExcelData;`)(
     xlsx, (error) => { if (error) throw new Error(error); }, {}, ...setters.map((name) => (value) => { result[name] = value; }),
   );

@@ -25,7 +25,7 @@ const app = fs.readFileSync(path.join(__dirname, '../src/App.tsx'), 'utf8');
 const processing = app.slice(app.indexOf('  const processExcelData ='), app.indexOf('  const handleFileUpload ='));
 const code = ts.transpileModule(processing, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 let data;
-const setters = ['setRawRows', 'setRawColumns', 'setSheetName', 'setFilters', 'setCompletionAvailable', 'setRawQuery'];
+const setters = ['setRawRows', 'setRawColumns', 'setSheetName', 'setFilters', 'setCompletionAvailable', 'setRawQuery', 'setDetailFamily'];
 const parse = new Function('xlsx', 'setError', 'emptyFilters', 'setData', ...setters, code + ';return processExcelData;')(
   xlsx, error => { if (error) throw new Error(error); }, {}, value => { data = value; }, ...setters.map(() => () => {}),
 );

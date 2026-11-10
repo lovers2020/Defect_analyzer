@@ -20,6 +20,38 @@
 .lot-rate-table tbody tr:nth-child(even) { background: #faf6ed; }
 .lot-rate-table tbody tr:last-child td { border-bottom: 0; }
 .lot-rate-value { display: inline-block; min-width: 75px; border-radius: 5px; padding: 3px 9px; background: #eee4d5; color: #634b3c; font-weight: 700; }
+
+.family-detail-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; align-items: start; }
+.family-picker { padding: 18px 12px 12px; }
+.family-picker h2 { padding: 0 7px 13px; display: flex; align-items: center; justify-content: space-between; }
+.family-list { display: flex; flex-direction: column; gap: 4px; max-height: 610px; overflow: auto; }
+.family-list button { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 12px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #634b3c; font-size: 14px; text-align: left; }
+.family-list button span { overflow-wrap: anywhere; }
+.family-list button strong { white-space: nowrap; font-size: 13px; font-variant-numeric: tabular-nums; }
+.family-list button:hover { background: #faf3dc; }
+.family-list button[aria-pressed="true"] { background: #eee4d5; border-color: #d3bc9e; color: #413634; font-weight: 700; }
+.family-detail-content { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.family-summary { padding: 18px 22px; }
+.family-summary h2 { display: flex; align-items: center; gap: 12px; }
+.family-summary dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; margin-top: 17px; }
+.family-summary dt { font-size: 13px; color: #746156; margin-bottom: 5px; }
+.family-summary dd { font-size: 23px; font-weight: 700; color: #413634; font-variant-numeric: tabular-nums; }
+.family-data-panel { overflow: hidden; }
+.family-data-panel h3 { padding: 16px 20px; border-bottom: 1px solid #dfd2c2; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.family-table-scroll { overflow: auto; max-height: 460px; }
+.family-symptom-scroll { max-height: 280px; }
+.family-detail-table { width: 100%; min-width: 500px; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+.family-detail-table th, .family-detail-table td { padding: 12px 15px; border-bottom: 1px solid #eee8de; vertical-align: middle; line-height: 1.6; }
+.family-detail-table th { position: sticky; top: 0; z-index: 1; background: #f7f0e4; color: #634b3c; text-align: left; font-weight: 650; white-space: nowrap; }
+.family-detail-table td { color: #534337; white-space: pre-wrap; overflow-wrap: anywhere; }
+.family-detail-table tbody tr:nth-child(even) { background: #faf6ed; }
+.family-detail-table tbody tr:last-child td { border-bottom: 0; }
+.family-detail-table th:not(:first-child), .family-detail-table td:not(:first-child) { text-align: center; }
+.family-detail-table td:last-child, .family-detail-table td:nth-last-child(2) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.family-records-table { min-width: 870px; }
+.family-records-table th:nth-child(3), .family-records-table td:nth-child(3), .family-records-table th:nth-child(4), .family-records-table td:nth-child(4) { text-align: left; min-width: 180px; }
+@media (max-width: 950px) { .family-detail-grid { grid-template-columns: 1fr; }.family-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 210px; }.family-summary dd { font-size: 20px; } }
+@media (max-width: 700px) { .dashboard-tabs-row { flex-wrap: wrap; }.dashboard-tabs { gap: 5px; overflow-x: auto; max-width: 100%; }.dashboard-tabs button { padding-inline: 10px; white-space: nowrap; font-size: 14px; }.family-summary { padding: 16px; }.family-summary dl { gap: 9px; }.family-summary dd { font-size: 17px; } }
 @theme { --color-amber-50: #faf3dc; --color-amber-300: #d3bc9e; --color-amber-500: #8b6c58; --color-amber-600: #413634; }
 
 button {

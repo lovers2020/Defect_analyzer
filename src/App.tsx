@@ -10,11 +10,13 @@ import { Dashboard } from "@/src/components/Dashboard";
 import { emptyFilters, matchesFilters, matchesRawSearch } from "@/src/lib/search";
 import { readUpload, saveUpload } from "@/src/lib/uploadStorage";
 import { getLotRates } from "@/src/lib/lotRates";
+import { getFamilyDetails } from "@/src/lib/familyDetails";
 
 export default function App() {
   const [data, setData] = useState<DefectData[]>([]);
   const [filters, setFilters] = useState<SearchFilters>({ ...emptyFilters });
-  const [activeTab, setActiveTab] = useState<"analysis" | "lot" | "raw">("analysis");
+  const [activeTab, setActiveTab] = useState<"analysis" | "family" | "lot" | "raw">("analysis");
+  const [detailFamily, setDetailFamily] = useState("");
   const [rawRows, setRawRows] = useState<RawRow[]>([]);
   const [rawColumns, setRawColumns] = useState<RawColumn[]>([]);
   const [sheetName, setSheetName] = useState("");
@@ -242,6 +244,7 @@ export default function App() {
       setSheetName(firstSheetName);
       setFilters({ ...emptyFilters });
       setRawQuery("");
+      setDetailFamily("");
       setCompletionAvailable(Boolean(completionDateColumn) || headers.some((header) => /조치\s*수량|Action/.test(String(header))));
       setError(null);
       return true;
@@ -309,6 +312,15 @@ export default function App() {
   };
   const exportResults = () => {
     const workbook = xlsx.utils.book_new();
+    if (activeTab === "family") {
+      const detail = getFamilyDetails(filteredData, detailFamily);
+      const symptoms = [["제품군", "부적합 증상", "발생 건수", "불량 수량", "조치 완료 수량"], ...detail.symptoms.map((row) => [detail.summary?.name, row.name, row.records, row.quantity, completionAvailable ? row.completed : ""])];
+      const rows = [["제품군", "제품명", "LOT", "부적합 증상 원문", "발생원인", "불량 수량", "조치 완료 수량"], ...detail.rows.map((row) => [detail.summary?.name, row.modelName, row.lot, row.originalSymptom, row.cause, row.quantity, completionAvailable ? row.actionQuantity : ""])];
+      xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet(symptoms), "증상별 집계");
+      xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet(rows), "상세 내역");
+      xlsx.writeFile(workbook, "제품군별_불량상세.xlsx");
+      return;
+    }
     if (activeTab === "lot") {
       const lots = getLotRates(filteredData);
       const rows = [["제품군", "제품명", "LOT", "LOT 수량", "불량 수량", "불량률"], ...lots.map((lot) => [lot.productFamily, lot.modelName, lot.lot, lot.capacity, lot.quantity, lot.rate])];
@@ -328,6 +340,7 @@ export default function App() {
     <Dashboard data={filteredData} totalRows={data.length} rawRows={filteredRawRows} columns={rawColumns}
       filters={filters} onFilters={changeFilters} families={families} models={models}
       activeTab={activeTab} onTab={setActiveTab} fileName={fileName} sheetName={sheetName}
+      detailFamily={detailFamily} onDetailFamily={setDetailFamily}
       loading={loading} error={error} completionAvailable={completionAvailable}
       onUpload={handleFileUpload} onSample={loadSample} onExport={exportResults} rawQuery={rawQuery} onRawQuery={setRawQuery} />
   );
