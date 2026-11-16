@@ -5,6 +5,7 @@ import { getLotRates, type LotRate } from "@/src/lib/lotRates";
 const columns: { key: keyof LotRate; label: string }[] = [
   { key: "productFamily", label: "제품군" }, { key: "modelName", label: "제품명" },
   { key: "lot", label: "LOT" }, { key: "capacity", label: "LOT 수량" },
+  { key: "symptoms", label: "불량 증상" },
   { key: "quantity", label: "불량 수량" }, { key: "rate", label: "불량률" },
 ];
 
@@ -25,9 +26,9 @@ export function LotRateTable({ data }: { data: DefectData[] }) {
         </th>)}</tr></thead>
         <tbody>{lots.length ? lots.map((row) => <tr key={row.lot}>
           <td>{row.productFamily || "—"}</td><td>{row.modelName || "—"}</td><td>{row.lot}</td>
-          <td>{row.capacity.toLocaleString()}대</td><td>{row.quantity.toLocaleString()}대</td>
+          <td>{row.capacity.toLocaleString()}대</td><td className="lot-symptoms">{row.symptoms || "—"}</td><td>{row.quantity.toLocaleString()}대</td>
           <td><strong className="lot-rate-value">{(row.rate * 100).toFixed(2)}%</strong></td>
-        </tr>) : <tr><td colSpan={6} className="empty-message">표시할 LOT가 없습니다.</td></tr>}</tbody>
+        </tr>) : <tr><td colSpan={7} className="empty-message">표시할 LOT가 없습니다.</td></tr>}</tbody>
       </table></div>
     </section>
   );

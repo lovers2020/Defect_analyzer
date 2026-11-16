@@ -323,9 +323,9 @@ export default function App() {
     }
     if (activeTab === "lot") {
       const lots = getLotRates(filteredData);
-      const rows = [["제품군", "제품명", "LOT", "LOT 수량", "불량 수량", "불량률"], ...lots.map((lot) => [lot.productFamily, lot.modelName, lot.lot, lot.capacity, lot.quantity, lot.rate])];
+      const rows = [["제품군", "제품명", "LOT", "LOT 수량", "불량 증상", "불량 수량", "불량률"], ...lots.map((lot) => [lot.productFamily, lot.modelName, lot.lot, lot.capacity, lot.symptoms, lot.quantity, lot.rate])];
       const sheet = xlsx.utils.aoa_to_sheet(rows);
-      lots.forEach((_, index) => { sheet[xlsx.utils.encode_cell({ r: index + 1, c: 5 })].z = "0.00%"; });
+      lots.forEach((_, index) => { sheet[xlsx.utils.encode_cell({ r: index + 1, c: 6 })].z = "0.00%"; });
       xlsx.utils.book_append_sheet(workbook, sheet, "LOT별 불량률");
       xlsx.writeFile(workbook, "LOT별_불량률.xlsx");
       return;

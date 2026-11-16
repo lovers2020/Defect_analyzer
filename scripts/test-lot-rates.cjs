@@ -37,3 +37,30 @@ assert.equal(data[2].lot, '2418');
 assert.equal(getLotRates(data)[0].rate, 0.02);
 assert.equal(data.reduce((sum, row) => sum + row.quantity, 0), 22);
 console.log('LOT capacity, cross-model aggregation, filter denominator, missing LOT exclusion and Excel parsing: passed');
+
+const symptomData = [
+  { ...record('1K', 2), symptom: 'RF Buffer Fail 5G' },
+  { ...record('1K', 3, 'B', 'M2'), symptom: 'LED 불량' },
+  { ...record('1K', 1), symptom: 'RF Buffer Fail 5G' },
+  { ...record('2K', 2), symptom: '다른 LOT 증상' },
+];
+const symptomLot = getLotRates(symptomData).find(row => row.lot === '1K');
+assert.deepEqual(symptomLot.symptoms.split('\n').sort(), ['LED 불량', 'RF Buffer Fail 5G'].sort());
+assert.equal(symptomLot.quantity, 6);
+assert.equal(symptomLot.rate, 0.006);
+assert.equal(getLotRates(symptomData.filter(row => row.productFamily === 'B'))[0].symptoms, 'LED 불량');
+
+let exported;
+const writer = { ...xlsx, writeFile(workbook) { exported = workbook; } };
+const exportSource = app.replace(/\r\n/g, '\n');
+const exportBlock = exportSource.slice(exportSource.indexOf('  const exportResults ='), exportSource.indexOf('  return (\n    <Dashboard'));
+const exportCode = ts.transpileModule(exportBlock, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+const exportLots = new Function('xlsx', 'getLotRates', 'filteredData', 'activeTab', exportCode + ';return exportResults;')(writer, getLotRates, symptomData, 'lot');
+exportLots();
+const exportedSheet = exported.Sheets['LOT별 불량률'];
+assert.equal(exportedSheet.E1.v, '불량 증상');
+assert.equal(exportedSheet.E2.v, symptomLot.symptoms);
+assert.equal(exportedSheet.F2.v, 6);
+assert.equal(exportedSheet.G2.v, 0.006);
+assert.equal(exportedSheet.G2.z, '0.00%');
+console.log('LOT symptom deduplication, filter isolation, unchanged rate and seven-column export: passed');
