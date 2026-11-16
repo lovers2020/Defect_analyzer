@@ -19,12 +19,12 @@ export function LotRateTable({ data }: { data: DefectData[] }) {
 
   return (
     <section className="design-panel lot-rate-panel" aria-label="LOT별 불량률">
-      <div className="lot-rate-heading"><h2 className="panel-title">LOT별 불량률</h2><span className="row-badge">{lots.length.toLocaleString()}개 LOT</span></div>
+      <div className="lot-rate-heading"><h2 className="panel-title">LOT별 불량률</h2><span className="row-badge">{new Set(lots.map((row) => row.lot)).size.toLocaleString()}개 LOT · {lots.length.toLocaleString()}개 항목</span></div>
       <div className="lot-rate-scroll"><table className="lot-rate-table">
         <thead><tr>{columns.map(({ key, label }) => <th key={key} scope="col" aria-sort={sort.key === key ? sort.ascending ? "ascending" : "descending" : "none"}>
           <button type="button" onClick={() => setSort({ key, ascending: sort.key === key ? !sort.ascending : true })}>{label} <span aria-hidden="true">{sort.key === key ? sort.ascending ? "↑" : "↓" : "↕"}</span></button>
         </th>)}</tr></thead>
-        <tbody>{lots.length ? lots.map((row) => <tr key={row.lot}>
+        <tbody>{lots.length ? lots.map((row) => <tr key={JSON.stringify([row.lot, row.symptoms])}>
           <td>{row.productFamily || "—"}</td><td>{row.modelName || "—"}</td><td>{row.lot}</td>
           <td>{row.capacity.toLocaleString()}대</td><td className="lot-symptoms">{row.symptoms || "—"}</td><td>{row.quantity.toLocaleString()}대</td>
           <td><strong className="lot-rate-value">{(row.rate * 100).toFixed(2)}%</strong></td>

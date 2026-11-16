@@ -44,10 +44,21 @@ const symptomData = [
   { ...record('1K', 1), symptom: 'RF Buffer Fail 5G' },
   { ...record('2K', 2), symptom: '다른 LOT 증상' },
 ];
-const symptomLot = getLotRates(symptomData).find(row => row.lot === '1K');
-assert.deepEqual(symptomLot.symptoms.split('\n').sort(), ['LED 불량', 'RF Buffer Fail 5G'].sort());
-assert.equal(symptomLot.quantity, 6);
-assert.equal(symptomLot.rate, 0.006);
+const symptomLots = getLotRates(symptomData);
+const symptomLot = symptomLots.find(row => row.lot === '1K' && row.symptoms === 'RF Buffer Fail 5G');
+const ledLot = symptomLots.find(row => row.lot === '1K' && row.symptoms === 'LED 불량');
+assert.equal(symptomLots.length, 3);
+assert.equal(symptomLots.filter(row => row.lot === '1K').length, 2);
+assert.equal(symptomLot.quantity, 3);
+assert.equal(symptomLot.capacity, 1000);
+assert.equal(symptomLot.rate, 0.003);
+assert.equal(symptomLot.productFamily, 'A');
+assert.equal(symptomLot.modelName, 'M1');
+assert.equal(ledLot.quantity, 3);
+assert.equal(ledLot.rate, 0.003);
+assert.equal(ledLot.productFamily, 'B');
+assert.equal(ledLot.modelName, 'M2');
+assert.equal(symptomLots.reduce((sum, row) => sum + row.quantity, 0), 8);
 assert.equal(getLotRates(symptomData.filter(row => row.productFamily === 'B'))[0].symptoms, 'LED 불량');
 
 let exported;
@@ -60,7 +71,12 @@ exportLots();
 const exportedSheet = exported.Sheets['LOT별 불량률'];
 assert.equal(exportedSheet.E1.v, '불량 증상');
 assert.equal(exportedSheet.E2.v, symptomLot.symptoms);
-assert.equal(exportedSheet.F2.v, 6);
-assert.equal(exportedSheet.G2.v, 0.006);
+assert.equal(exportedSheet.F2.v, 3);
+assert.equal(exportedSheet.G2.v, 0.003);
 assert.equal(exportedSheet.G2.z, '0.00%');
-console.log('LOT symptom deduplication, filter isolation, unchanged rate and seven-column export: passed');
+const exportedRows = xlsx.utils.sheet_to_json(exportedSheet, { header: 1 });
+assert.equal(exportedRows.length, 4);
+assert.equal(exportedRows.filter(row => row[2] === '1K').length, 2);
+assert.equal(exportedRows.find(row => row[4] === 'LED 불량')[6], 0.003);
+assert.equal(new Set(symptomLots.map(row => JSON.stringify([row.lot, row.symptoms]))).size, 3);
+console.log('LOT + symptom grouping, per-symptom rates, product attribution, totals and separate Excel rows: passed');
