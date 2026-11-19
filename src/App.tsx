@@ -290,13 +290,13 @@ export default function App() {
     setError(null);
     setLoading(true);
     try {
-      const response = await fetch("/sample-defects-2026-10-week4.xlsx");
+      const response = await fetch("/sample-defects-2026-11-week3.xlsx");
       if (!response.ok || response.headers.get("content-type")?.includes("text/html")) {
         throw new Error("샘플 파일을 불러오지 못했습니다.");
       }
       const buffer = await response.arrayBuffer();
       if (!processExcelData(buffer)) return;
-      const name = "26년 10월4주차 공정부적합.xlsx";
+      const name = "26년 11월3주차 공정부적합.xlsx";
       setFileName(name);
       setActiveTab("analysis");
       try {
