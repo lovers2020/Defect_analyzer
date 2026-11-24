@@ -185,7 +185,11 @@ export default function App() {
 
         if (symptom) {
           const sourceRow = sourceByRow.get(row.__rowNum__ + 1);
-          let symptomStr = String(symptom).trim();
+          const originalSymptom = String(symptom).trim();
+          let symptomStr = originalSymptom
+            .replace(/\(\s*재\s*불량\s*\)|\[\s*재\s*불량\s*\]|（\s*재\s*불량\s*）|【\s*재\s*불량\s*】|재\s*불량/g, " ")
+            .replace(/\s+/g, " ")
+            .trim() || originalSymptom;
           const productFamilyStr = productFamily
             ? String(productFamily).trim()
             : "-";
@@ -222,7 +226,7 @@ export default function App() {
             modelName: sourceRow?.modelName.trim() || "",
             lot: String(numericMatrix[row.__rowNum__ - 6]?.[lotIndex] ?? "").trim(),
             cause: sourceRow?.cause.trim() || "",
-            originalSymptom: String(symptom).trim(),
+            originalSymptom,
             quantity: Number(quantity) || 0,
             actionQuantity: Number(actionQty) || 0,
             symptom: symptomStr,

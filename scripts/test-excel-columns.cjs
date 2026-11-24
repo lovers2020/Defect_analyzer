@@ -47,3 +47,26 @@ const recurring = analyze(['발생수량', '부적합 증상', '2차 재불량\n
 ]);
 assert.deepEqual(recurring.setData.map((row) => row.actionQuantity), [3, 0, 0, 5, 0, 0]);
 console.log('Completion date must be after second recurrence, including same-day and duplicate completion columns: passed');
+
+const symptomNames = ['RF Buffer Fail 5G', 'RF Buffer Fail 5G 재불량', '전원 불량', '전원 불량(재불량)', '전원 불량 [재 불량]', 'LED 불량', '재불량 LED 불량', 'LED 불량（재불량）', 'LED 불량【재불량】', '3.3V 쇼트 재불량', '재불량'];
+const normalized = analyze(['제품군', '모델명', 'LOT', '발생수량', '부적합 증상'], symptomNames.map((name) => ['A', 'M1', '1K', 2, name]));
+assert.deepEqual(normalized.setData.map((row) => row.symptom), ['RF Buffer Fail 5G', 'RF Buffer Fail 5G', '전원 불량', '전원 불량', '전원 불량', 'LED 불량', 'LED 불량', 'LED 불량', 'LED 불량', '3.3V 쇼트', '재불량']);
+assert.deepEqual(normalized.setData.map((row) => row.originalSymptom), symptomNames);
+assert.deepEqual(normalized.setRawRows.map((row) => row.symptom), symptomNames);
+assert.equal(normalized.setData.reduce((sum, row) => sum + row.quantity, 0), 22);
+function loadLibrary(name) {
+  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib', name), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+  const moduleObject = { exports: {} };
+  new Function('exports', 'module', code)(moduleObject.exports, moduleObject);
+  return moduleObject.exports;
+}
+const { getLotRates } = loadLibrary('lotRates.ts');
+const { getFamilyDetails } = loadLibrary('familyDetails.ts');
+const lotGroups = getLotRates(normalized.setData);
+assert.equal(lotGroups.length, 5);
+assert.equal(lotGroups.find((row) => row.symptoms === 'LED 불량').quantity, 8);
+assert.equal(lotGroups.find((row) => row.symptoms === 'LED 불량').rate, 0.008);
+const family = getFamilyDetails(normalized.setData, 'A');
+assert.equal(family.symptoms.length, 5);
+assert.equal(family.symptoms.find((row) => row.name === '전원 불량').quantity, 6);
+console.log('Recurrence labels merge across symptoms, LOT and family totals while preserving original records and all quantities: passed');
