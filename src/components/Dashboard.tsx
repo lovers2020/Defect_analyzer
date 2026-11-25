@@ -26,7 +26,6 @@ type Props = {
   error: string | null;
   completionAvailable: boolean;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
-  onSample: () => void;
   onExport: () => void;
   rawQuery: string;
   onRawQuery: (query: string) => void;
@@ -49,7 +48,6 @@ export function Dashboard(props: Props) {
       <header className="dashboard-header">
         <a href="#" className="dashboard-brand" aria-label="DefectAnalyzer 홈"><BarChart3 size={30} strokeWidth={3} /><strong>DefectAnalyzer</strong><span>불량 분석</span></a>
         <div className="header-actions">
-          <button type="button" className="design-button outline" onClick={props.onSample} disabled={props.loading}><File size={17} />샘플 파일</button>
           <button type="button" className="design-button primary" onClick={() => input.current?.click()} disabled={props.loading}><Upload size={17} />{props.loading ? "읽는 중..." : "파일 업로드"}</button>
         </div>
         <input ref={input} type="file" className="hidden" accept=".csv,.xlsx,.xls" aria-label="분석할 파일 선택" disabled={props.loading} onChange={props.onUpload} onClick={(event) => { event.currentTarget.value = ""; }} />

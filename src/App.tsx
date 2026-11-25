@@ -12,6 +12,16 @@ import { readUpload, saveUpload } from "@/src/lib/uploadStorage";
 import { getLotRates } from "@/src/lib/lotRates";
 import { getFamilyDetails } from "@/src/lib/familyDetails";
 
+const defaultWorkbook = {
+  path: "/sample-defects-2026-11-week4.xlsx",
+  name: "26년 11월4주차 공정부적합.xlsx",
+};
+const previousSampleNames = new Set([
+  "26년 10월4주차 공정부적합.xlsx",
+  "26년 11월3주차 공정부적합.xlsx",
+  defaultWorkbook.name,
+]);
+
 export default function App() {
   const [data, setData] = useState<DefectData[]>([]);
   const [filters, setFilters] = useState<SearchFilters>({ ...emptyFilters });
@@ -34,7 +44,7 @@ export default function App() {
         try {
           const saved = await readUpload();
           if (cancelled) return;
-          if (saved && processExcelData(saved.buffer)) {
+          if (saved && (saved.source === "upload" || !previousSampleNames.has(saved.name)) && processExcelData(saved.buffer)) {
             setFileName(saved.name);
             return;
           }
@@ -42,29 +52,17 @@ export default function App() {
           console.error("Failed to restore uploaded file", storageError);
         }
         if (cancelled) return;
-        const response = await fetch("/data.xlsx");
+        const response = await fetch(defaultWorkbook.path);
         if (cancelled) return;
-        if (!response.ok) {
-          // If the default data is not found, we don't throw an error, we just leave it empty.
-          // In deployment this will gracefully fail if data.xlsx doesn't exist.
-          setLoading(false);
-          return;
-        }
-
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("text/html")) {
-          // The dev server might return index.html for missing assets.
-          // In this case, the file doesn't actually exist.
-          setLoading(false);
-          return;
+        if (!response.ok || response.headers.get("content-type")?.includes("text/html")) {
+          throw new Error("기본 파일을 불러오지 못했습니다.");
         }
 
         const arrayBuffer = await response.arrayBuffer();
         if (cancelled) return;
-        setFileName("기본 업로드된 파일 (data.xlsx)");
-        processExcelData(arrayBuffer);
-      } catch (err: any) {
-        console.error("Failed to load default data", err);
+        if (processExcelData(arrayBuffer)) setFileName(defaultWorkbook.name);
+      } catch {
+        if (!cancelled) setError("기본 파일을 불러오지 못했습니다. 분석할 파일을 직접 업로드해 주세요.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -270,7 +268,7 @@ export default function App() {
       if (processExcelData(arrayBuffer)) {
         setFileName(file.name);
         try {
-          await saveUpload({ name: file.name, buffer: arrayBuffer });
+          await saveUpload({ name: file.name, buffer: arrayBuffer, source: "upload" });
         } catch {
           setError("파일은 분석했지만 브라우저에 저장하지 못했습니다. 새로고침하면 다시 업로드해야 합니다.");
         }
@@ -289,30 +287,6 @@ export default function App() {
   const changeFilters = (next: SearchFilters) => {
     setFilters(next.productFamily !== filters.productFamily ? { ...next, modelName: "" } : next);
     if (Object.values(next).every((value) => !value)) setRawQuery("");
-  };
-  const loadSample = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const response = await fetch("/sample-defects-2026-11-week4.xlsx");
-      if (!response.ok || response.headers.get("content-type")?.includes("text/html")) {
-        throw new Error("샘플 파일을 불러오지 못했습니다.");
-      }
-      const buffer = await response.arrayBuffer();
-      if (!processExcelData(buffer)) return;
-      const name = "26년 11월4주차 공정부적합.xlsx";
-      setFileName(name);
-      setActiveTab("analysis");
-      try {
-        await saveUpload({ name, buffer });
-      } catch {
-        setError("샘플 파일은 분석했지만 브라우저에 저장하지 못했습니다. 새로고침하면 다시 선택해야 합니다.");
-      }
-    } catch (err: any) {
-      setError("샘플 파일을 불러오는 중 오류가 발생했습니다: " + err.message);
-    } finally {
-      setLoading(false);
-    }
   };
   const exportResults = () => {
     const workbook = xlsx.utils.book_new();
@@ -346,6 +320,6 @@ export default function App() {
       activeTab={activeTab} onTab={setActiveTab} fileName={fileName} sheetName={sheetName}
       detailFamily={detailFamily} onDetailFamily={setDetailFamily}
       loading={loading} error={error} completionAvailable={completionAvailable}
-      onUpload={handleFileUpload} onSample={loadSample} onExport={exportResults} rawQuery={rawQuery} onRawQuery={setRawQuery} />
+      onUpload={handleFileUpload} onExport={exportResults} rawQuery={rawQuery} onRawQuery={setRawQuery} />
   );
 }

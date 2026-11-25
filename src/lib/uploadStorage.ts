@@ -1,4 +1,4 @@
-type SavedUpload = { name: string; buffer: ArrayBuffer };
+type SavedUpload = { name: string; buffer: ArrayBuffer; source?: "upload" };
 
 function accessUpload<T>(mode: IDBTransactionMode, operation: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
