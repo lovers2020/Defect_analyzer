@@ -1,4 +1,15 @@
 {
+  "headers": [
+    {
+      "source": "/sample-defects-2026-11-week4.xlsx",
+      "headers": [
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename*=UTF-8''26%EB%85%84%2011%EC%9B%944%EC%A3%BC%EC%B0%A8%20%EA%B3%B5%EC%A0%95%EB%B6%80%EC%A0%81%ED%95%A9.xlsx"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
