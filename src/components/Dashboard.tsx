@@ -1,5 +1,4 @@
-import { AlertCircle, BarChart3, CheckCircle2, Database, File, FileText, RotateCcw, Upload } from "lucide-react";
-import { useRef, type ChangeEvent } from "react";
+import { AlertCircle, BarChart3, CheckCircle2, Database, Download, File, FileText, Upload } from "lucide-react";
 import { DefectData, RawColumn, RawRow, SearchFilters } from "@/src/types";
 import { SearchPanel } from "@/src/components/SearchPanel";
 import { RawDataTable } from "@/src/components/RawDataTable";
@@ -25,14 +24,13 @@ type Props = {
   loading: boolean;
   error: string | null;
   completionAvailable: boolean;
-  onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  workbook: { path: string; name: string };
   onExport: () => void;
   rawQuery: string;
   onRawQuery: (query: string) => void;
 };
 
 export function Dashboard(props: Props) {
-  const input = useRef<HTMLInputElement>(null);
   const quantity = props.data.reduce((sum, row) => sum + row.quantity, 0);
   const completed = props.data.reduce((sum, row) => sum + row.actionQuantity, 0);
   const rate = props.completionAvailable && quantity > 0 ? `${(completed / quantity * 100).toFixed(1)}%` : "—";
@@ -48,17 +46,14 @@ export function Dashboard(props: Props) {
       <header className="dashboard-header">
         <a href="#" className="dashboard-brand" aria-label="DefectAnalyzer 홈"><BarChart3 size={30} strokeWidth={3} /><strong>DefectAnalyzer</strong><span>불량 분석</span></a>
         <div className="header-actions">
-          <button type="button" className="design-button primary" onClick={() => input.current?.click()} disabled={props.loading}><Upload size={17} />{props.loading ? "읽는 중..." : "파일 업로드"}</button>
+          <a className="design-button primary" href={props.workbook.path} download={props.workbook.name}><Download size={17} aria-hidden="true" />파일 다운로드</a>
         </div>
-        <input ref={input} type="file" className="hidden" accept=".csv,.xlsx,.xls" aria-label="분석할 파일 선택" disabled={props.loading} onChange={props.onUpload} onClick={(event) => { event.currentTarget.value = ""; }} />
       </header>
       <main className="dashboard-main">
         <div className="dashboard-intro"><h1>불량 분석 대시보드</h1><p>공정 부적합 데이터를 검색하고 조치 현황을 확인하세요.</p></div>
         <section className="design-panel file-panel" aria-label="데이터 파일">
-          <div className="file-details"><FileText size={25} /><strong title={props.fileName || ""}>{props.fileName || "분석할 파일을 업로드하세요"}</strong>{props.sheetName && <span className="file-badge">{props.sheetName}</span>}{props.fileName && <span className="row-badge">{props.totalRows.toLocaleString()}행</span>}</div>
-          <button type="button" className="design-button outline small file-change-button" onClick={() => input.current?.click()} disabled={props.loading}><RotateCcw size={15} />파일 변경</button>
+          <div className="file-details"><FileText size={25} /><strong title={props.fileName || ""}>{props.fileName || (props.loading || !props.error ? "기본 파일을 읽는 중…" : "기본 파일을 열 수 없습니다")}</strong>{props.sheetName && <span className="file-badge">{props.sheetName}</span>}{props.fileName && <span className="row-badge">{props.totalRows.toLocaleString()}행</span>}</div>
         </section>
-        <p className="file-note">CSV / Excel 지원 · 첫 번째 시트 · 7번째 행을 헤더로 사용</p>
         {props.error && <div role="alert" className="error-message"><AlertCircle size={18} />{props.error}</div>}
         <SearchPanel filters={props.filters} onChange={props.onFilters} families={props.families} models={props.models} />
         <div className="dashboard-tabs-row">

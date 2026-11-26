@@ -22,7 +22,7 @@ assert.equal(lots[0].modelName, 'M1, M2');
 assert.equal(getLotRates([record('1K(260101)', 5)])[0].rate, 0.005);
 
 const app = fs.readFileSync(path.join(__dirname, '../src/App.tsx'), 'utf8');
-const processing = app.slice(app.indexOf('  const processExcelData ='), app.indexOf('  const handleFileUpload ='));
+const processing = app.slice(app.indexOf('  const processExcelData ='), app.indexOf('  const filteredData ='));
 const code = ts.transpileModule(processing, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 let data;
 const setters = ['setRawRows', 'setRawColumns', 'setSheetName', 'setFilters', 'setCompletionAvailable', 'setRawQuery', 'setDetailFamily'];

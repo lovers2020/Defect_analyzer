@@ -141,7 +141,6 @@ select.design-input { cursor: pointer; }
 
 
 .design-button.outline { color: #634b3c; border-width: .1px; border-color: #eee8de; }
-.file-panel .file-change-button { border: .1px solid rgb(223 210 194 / 5%); box-shadow: none; }
 .design-button.outline:hover:not(:disabled) { background: #faf3dc; }
 .header-actions .design-button.outline { color: #413634; border-color: #eee8de; background: #faf3dc; }
 .header-actions .design-button.outline:hover:not(:disabled) { background: #eee4d5; }
@@ -196,7 +195,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .dashboard-brand strong { font-size: 20px; }
   .dashboard-brand span { display: none; }
   .header-actions { width: 100%; }
-  .header-actions button { flex: 1; }
+  .header-actions .design-button { flex: 1; }
   .dashboard-main { padding: 20px 16px; }
   .dashboard-intro h1 { font-size: 24px; }
   .file-panel { align-items: flex-start; padding: 14px; flex-wrap: wrap; }

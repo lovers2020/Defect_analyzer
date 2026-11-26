@@ -3,12 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import * as xlsx from "xlsx";
 import { DefectData, RawColumn, RawRow, SearchFilters } from "@/src/types";
 import { Dashboard } from "@/src/components/Dashboard";
 import { emptyFilters, matchesFilters, matchesRawSearch } from "@/src/lib/search";
-import { readUpload, saveUpload } from "@/src/lib/uploadStorage";
 import { getLotRates } from "@/src/lib/lotRates";
 import { getFamilyDetails } from "@/src/lib/familyDetails";
 
@@ -16,11 +15,6 @@ const defaultWorkbook = {
   path: "/sample-defects-2026-11-week4.xlsx",
   name: "26년 11월4주차 공정부적합.xlsx",
 };
-const previousSampleNames = new Set([
-  "26년 10월4주차 공정부적합.xlsx",
-  "26년 11월3주차 공정부적합.xlsx",
-  defaultWorkbook.name,
-]);
 
 export default function App() {
   const [data, setData] = useState<DefectData[]>([]);
@@ -41,17 +35,6 @@ export default function App() {
     const loadDefaultData = async () => {
       setLoading(true);
       try {
-        try {
-          const saved = await readUpload();
-          if (cancelled) return;
-          if (saved && (saved.source === "upload" || !previousSampleNames.has(saved.name)) && processExcelData(saved.buffer)) {
-            setFileName(saved.name);
-            return;
-          }
-        } catch (storageError) {
-          console.error("Failed to restore uploaded file", storageError);
-        }
-        if (cancelled) return;
         const response = await fetch(defaultWorkbook.path);
         if (cancelled) return;
         if (!response.ok || response.headers.get("content-type")?.includes("text/html")) {
@@ -62,7 +45,7 @@ export default function App() {
         if (cancelled) return;
         if (processExcelData(arrayBuffer)) setFileName(defaultWorkbook.name);
       } catch {
-        if (!cancelled) setError("기본 파일을 불러오지 못했습니다. 분석할 파일을 직접 업로드해 주세요.");
+        if (!cancelled) setError("기본 파일을 불러오지 못했습니다. 새로고침해 주세요.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -130,6 +113,7 @@ export default function App() {
         return typeof a === "string";
       };
 
+      const recurrenceNote = /재\s*(?:불량|발생)|\d+\s*차\s*불량/;
       const parsedData: DefectData[] = [];
 
       for (const row of rawData) {
@@ -185,14 +169,19 @@ export default function App() {
           const sourceRow = sourceByRow.get(row.__rowNum__ + 1);
           const originalSymptom = String(symptom).trim();
           let symptomStr = originalSymptom
-            .replace(/\(\s*재\s*불량\s*\)|\[\s*재\s*불량\s*\]|（\s*재\s*불량\s*）|【\s*재\s*불량\s*】|재\s*불량/g, " ")
+            .replace(/(?:\s*[/,:ㅡ-])?\s*(?:\([^()]*\)|\[[^\[\]]*\]|（[^（）]*）|【[^【】]*】)/g, (note) => recurrenceNote.test(note) ? " " : note)
+            .replace(/(?:\s*[/,:-]\s*|\s+)(?:\d+\s*차\s*)?(?:재\s*(?:불량|발생)|\d+\s*차\s*불량).*$/s, "")
+            .replace(/재\s*불량/g, " ")
             .replace(/\s+/g, " ")
             .trim() || originalSymptom;
           const productFamilyStr = productFamily
             ? String(productFamily).trim()
             : "-";
 
-          if (
+          if (/\bRF\s*Buffer\s*Fail\s*5\s*G\b/i.test(originalSymptom) ||
+            /^(?:Con\s*TX\s*,?\s*RF\s*Fail\s*5\s*G|5\s*G\s*불량)$/i.test(symptomStr)) {
+            symptomStr = "RF Buffer Fail 5G";
+          } else if (
             symptomStr.includes("A/B") &&
             symptomStr.includes("채널") &&
             symptomStr.includes("편차")
@@ -256,30 +245,6 @@ export default function App() {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      if (processExcelData(arrayBuffer)) {
-        setFileName(file.name);
-        try {
-          await saveUpload({ name: file.name, buffer: arrayBuffer, source: "upload" });
-        } catch {
-          setError("파일은 분석했지만 브라우저에 저장하지 못했습니다. 새로고침하면 다시 업로드해야 합니다.");
-        }
-      }
-    } catch (err: any) {
-      setError("파일을 분석하는 중 오류가 발생했습니다: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const filteredData = useMemo(() => data.filter((row) => matchesFilters({ ...row, symptom: row.originalSymptom }, filters)), [data, filters]);
   const filteredRawRows = useMemo(() => rawRows.filter((row) => matchesFilters(row, filters)), [rawRows, filters]);
   const families = useMemo(() => Array.from(new Set<string>(rawRows.map((row) => row.productFamily.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko")), [rawRows]);
@@ -320,6 +285,6 @@ export default function App() {
       activeTab={activeTab} onTab={setActiveTab} fileName={fileName} sheetName={sheetName}
       detailFamily={detailFamily} onDetailFamily={setDetailFamily}
       loading={loading} error={error} completionAvailable={completionAvailable}
-      onUpload={handleFileUpload} onExport={exportResults} rawQuery={rawQuery} onRawQuery={setRawQuery} />
+      workbook={defaultWorkbook} onExport={exportResults} rawQuery={rawQuery} onRawQuery={setRawQuery} />
   );
 }

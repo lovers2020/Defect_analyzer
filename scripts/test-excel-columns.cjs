@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const xlsx = require('xlsx');
 const ts = require('typescript');
 const source = fs.readFileSync(path.join(__dirname, '../src/App.tsx'), 'utf8');
-const processing = source.slice(source.indexOf('  const processExcelData ='), source.indexOf('  const handleFileUpload ='));
+const processing = source.slice(source.indexOf('  const processExcelData ='), source.indexOf('  const filteredData ='));
 const compiled = ts.transpileModule(processing, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 function analyze(headers, rows) {
   const result = {};
@@ -70,3 +70,19 @@ const family = getFamilyDetails(normalized.setData, 'A');
 assert.equal(family.symptoms.length, 5);
 assert.equal(family.symptoms.find((row) => row.name === '전원 불량').quantity, 6);
 console.log('Recurrence labels merge across symptoms, LOT and family totals while preserving original records and all quantities: passed');
+
+const variants = [
+  ['RF Buffer Fail 5G (ConTX 불량 추가/4차 재불량)', 'RF Buffer Fail 5G'],
+  ['Con TX Fail 5G RF Buffer Fail 5G', 'RF Buffer Fail 5G'],
+  ['Con TX, RF Fail 5G', 'RF Buffer Fail 5G'],
+  ['Con TX RF Fail 5G', 'RF Buffer Fail 5G'],
+  ['5G 불량', 'RF Buffer Fail 5G'],
+  ['Con TX Fail 5G', 'Con TX Fail 5G'],
+  ['RF Buffer Fail 2.4G (2차 재불량)', 'RF Buffer Fail 2.4G'],
+  ['전원 불량 (3차 재발생, 조치 후 재확인)', '전원 불량'],
+  ['LED 불량 / 2차불량, 추가 확인', 'LED 불량'],
+  ['광통신 불량 (TX)', '광통신 불량 (TX)'],
+];
+const variantsResult = analyze(['발생수량', '부적합 증상'], variants.map(([raw]) => [1, raw]));
+assert.deepEqual(variantsResult.setData.map((row) => row.symptom), variants.map(([, label]) => label));
+assert.deepEqual(variantsResult.setData.map((row) => row.originalSymptom), variants.map(([raw]) => raw));
